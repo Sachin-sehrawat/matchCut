@@ -1,11 +1,11 @@
-export default function Poster({ id, radius = 22, style }) {
+export default function Poster({ id, src, radius = 22, style }) {
   return (
     <div
       style={{
         position: 'absolute',
         inset: 0,
         borderRadius: radius,
-        backgroundImage: `url(https://picsum.photos/seed/${id}/500/750)`,
+        backgroundImage: `url(${src || `https://picsum.photos/seed/${id}/500/750`})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         ...style,

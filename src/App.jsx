@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import PhoneFrame from './components/PhoneFrame.jsx';
 import Poster, { Avatar } from './components/Poster.jsx';
-import { GENRES, LANGUAGES, REGIONS, MOVIES, FRIENDS, CONTACTS, clamp, initials, avatarBgFor } from './data.js';
+import { GENRES, LANGUAGES, REGIONS, FALLBACK_MOVIES, FRIENDS, CONTACTS, clamp, initials, avatarBgFor } from './data.js';
+import { fetchMovies, simpleHash } from './tmdb.js';
 
 const SUPERLIKE_LIMIT = 5;
 const TRAILER_DELAY_MS = 3000;
@@ -19,6 +20,9 @@ export default function App() {
   const [genresSel, setGenresSel] = useState([]);
   const [language, setLanguage] = useState(null);
   const [region, setRegion] = useState(null);
+
+  const [movies, setMovies] = useState([]);
+  const [moviesLoading, setMoviesLoading] = useState(false);
 
   const [deckIndex, setDeckIndex] = useState(0);
   const [dragDx, setDragDx] = useState(0);
@@ -41,7 +45,7 @@ export default function App() {
   const dragStart = useRef(null);
   const trailerTimer = useRef(null);
   const stateRef = useRef();
-  stateRef.current = { dragDx, dragDy, deckIndex, superlikesUsed, exitDir };
+  stateRef.current = { dragDx, dragDy, deckIndex, superlikesUsed, exitDir, movies };
 
   // — trailer autoplay —
   useEffect(() => {
@@ -116,7 +120,7 @@ export default function App() {
       return;
     }
     const prevDeckIndex = stateRef.current.deckIndex;
-    const movie = MOVIES[prevDeckIndex];
+    const movie = stateRef.current.movies[prevDeckIndex];
     const wasLiked = dir === 'right' || dir === 'up';
     setExitDir(dir);
     setDragging(false);
@@ -149,9 +153,23 @@ export default function App() {
   };
   const resetDeck = () => { setDeckIndex(0); setHistory([]); };
 
+  const loadMovies = async () => {
+    setMoviesLoading(true);
+    let results = [];
+    try {
+      results = await fetchMovies({ genres: genresSel, language, region });
+    } catch {
+      results = [];
+    }
+    setMovies(results.length ? results : FALLBACK_MOVIES);
+    setDeckIndex(0);
+    setHistory([]);
+    setMoviesLoading(false);
+  };
+
   const goToOnboarding = () => setScreen('onboarding');
   const goToLogin = () => { setScreen('login'); setTab('home'); };
-  const finishOnboarding = () => { if (genresSel.length) setScreen('app'); };
+  const finishOnboarding = () => { if (genresSel.length) { setScreen('app'); loadMovies(); } };
   const toggleGenre = (g) => setGenresSel((s) => (s.includes(g) ? s.filter((x) => x !== g) : [...s, g]));
 
   const openPaywall = () => setShowPaywall(true);
@@ -169,18 +187,22 @@ export default function App() {
 
   // — derived values —
   const superlikesLeft = Math.max(0, SUPERLIKE_LIMIT - superlikesUsed);
-  const partnerCommon = MOVIES.filter((m) => likedMovies.includes(m.id) && m.partnerLiked);
-  const friendsWithCommon = FRIENDS.map((f) => (f.id === 'partner' ? { ...f, common: partnerCommon.map((m) => m.id) } : f));
+  const partnerCommon = movies.filter((m) => likedMovies.includes(m.id) && m.partnerLiked);
+  const friendsWithCommon = FRIENDS.map((f) => {
+    if (f.id === 'partner') return { ...f, common: partnerCommon.map((m) => m.id) };
+    if (f.status === 'pending') return { ...f, common: [] };
+    return { ...f, common: movies.filter((m) => simpleHash(m.id + f.id) % 3 === 0).map((m) => m.id) };
+  });
   const activeFriendRaw = friendsWithCommon.find((f) => f.id === activeFriendId) || friendsWithCommon[0];
-  const commonMovies = (activeFriendRaw.common || []).map((id) => MOVIES.find((m) => m.id === id)).filter(Boolean);
+  const commonMovies = (activeFriendRaw.common || []).map((id) => movies.find((m) => m.id === id)).filter(Boolean);
   const chipFriends = friendsWithCommon.filter((f) => f.status !== 'pending');
   const prefsSummary = [genresSel[0], language, region].filter(Boolean).join(' · ') || 'Not set';
   const hasNewMatch = partnerCommon.length > 0;
 
   let topCard = null;
   let stackCards = [];
-  if (deckIndex < MOVIES.length) {
-    const m = MOVIES[deckIndex];
+  if (deckIndex < movies.length) {
+    const m = movies[deckIndex];
     const dominant = Math.abs(dragDx) > Math.abs(dragDy) ? 'h' : 'v';
     let tx = dragDx, ty = dragDy, rot = dragDx / 18, opacity = 1;
     let transition = dragging ? 'none' : 'transform .4s cubic-bezier(.2,.8,.2,1)';
@@ -203,7 +225,7 @@ export default function App() {
       superOpacity: !exitDir && dominant === 'v' ? clamp(-dragDy / 110, 0, 1) : (exitDir === 'up' ? 1 : 0),
       nopeOpacity: !exitDir && dominant === 'v' ? clamp(dragDy / 110, 0, 1) : (exitDir === 'down' ? 1 : 0),
     };
-    stackCards = MOVIES.slice(deckIndex + 1, deckIndex + 3).map((mv, i) => ({
+    stackCards = movies.slice(deckIndex + 1, deckIndex + 3).map((mv, i) => ({
       movie: mv,
       transform: i === 0 ? 'translateY(14px) scale(0.96)' : 'translateY(26px) scale(0.92)',
       z: i === 0 ? 9 : 8,
@@ -237,7 +259,7 @@ export default function App() {
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               {tab === 'home' && (
                 <DiscoverScreen
-                  topCard={topCard} stackCards={stackCards}
+                  topCard={topCard} stackCards={stackCards} moviesLoading={moviesLoading}
                   startDrag={startDrag}
                   undoSwipe={undoSwipe} undoDisabled={history.length === 0}
                   resetDeck={resetDeck}
@@ -350,7 +372,7 @@ function ChipRow({ children, last }) {
   return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: last ? 28 : 24 }}>{children}</div>;
 }
 
-function DiscoverScreen({ topCard, stackCards, startDrag, undoSwipe, undoDisabled, resetDeck, swipeLike, swipeMaybe, swipeDiscard, swipeSuper }) {
+function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwipe, undoDisabled, resetDeck, swipeLike, swipeMaybe, swipeDiscard, swipeSuper }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '58px 18px 14px', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -365,7 +387,7 @@ function DiscoverScreen({ topCard, stackCards, startDrag, undoSwipe, undoDisable
           <>
             {stackCards.map((sc) => (
               <div key={sc.movie.id} style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: 'var(--color-neutral-300)', transform: sc.transform, zIndex: sc.z, boxShadow: 'var(--shadow-sm)', borderRadius: 22 }}>
-                <Poster id={sc.movie.id} />
+                <Poster id={sc.movie.id} src={sc.movie.posterUrl} />
               </div>
             ))}
 
@@ -375,7 +397,7 @@ function DiscoverScreen({ topCard, stackCards, startDrag, undoSwipe, undoDisable
               onTouchStart={startDrag}
             >
               <div style={{ position: 'absolute', inset: 0, animation: 'kenburns 9s ease-in-out infinite alternate' }}>
-                <Poster id={topCard.movie.id} />
+                <Poster id={topCard.movie.id} src={topCard.movie.posterUrl} />
               </div>
 
               <div style={{ position: 'absolute', top: 16, left: 16, font: '800 22px var(--font-heading)', color: '#fff', padding: '6px 10px', border: '2px solid #fff', borderRadius: 10, transform: 'rotate(-14deg)', opacity: topCard.likeOpacity }}>LIKE</div>
@@ -404,6 +426,10 @@ function DiscoverScreen({ topCard, stackCards, startDrag, undoSwipe, undoDisable
               </div>
             </div>
           </>
+        ) : moviesLoading ? (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 30px', gap: 14 }}>
+            <div style={{ font: '800 20px var(--font-heading)', color: 'var(--color-text)' }}>Finding movies for you…</div>
+          </div>
         ) : (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 30px', gap: 14 }}>
             <div style={{ font: '800 20px var(--font-heading)', color: 'var(--color-text)' }}>You're all caught up</div>
@@ -457,7 +483,7 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
           {commonMovies.map((m) => (
             <div key={m.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)' }}>
               <div style={{ width: 56, height: 80, flex: 'none', background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative' }}>
-                <Poster id={m.id} radius={12} />
+                <Poster id={m.id} src={m.posterUrl} radius={12} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
                 <span className="tag tag-accent" style={{ alignSelf: 'flex-start', font: '700 9.5px var(--font-body)' }}>You both liked</span>
@@ -608,7 +634,7 @@ function MatchModalFull({ movie, viewInMatches, dismissMatch }) {
       <div style={{ font: '800 34px/1.1 var(--font-heading)', color: '#fff', marginBottom: 22 }}>Both liked<br />{movie.title}</div>
       <div style={{ display: 'flex', marginBottom: 20 }}>
         <div style={{ width: 88, height: 120, background: 'var(--color-neutral-300)', border: '3px solid #fff', overflow: 'hidden', transform: 'rotate(-6deg)', borderRadius: 14, position: 'relative' }}>
-          <Poster id={movie.id} radius={11} />
+          <Poster id={movie.id} src={movie.posterUrl} radius={11} />
         </div>
         <div style={{ width: 60, height: 60, background: '#fff', color: 'var(--color-accent-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '800 18px var(--font-heading)', marginLeft: -16, marginTop: 30, border: '3px solid var(--color-accent)', borderRadius: '50%' }}>JK</div>
       </div>

@@ -2,7 +2,7 @@ export const GENRES = ['Action', 'Comedy', 'Drama', 'Sci-Fi', 'Horror', 'Romance
 export const LANGUAGES = ['English', 'Spanish', 'French', 'Korean', 'Hindi', 'Japanese'];
 export const REGIONS = ['United States', 'United Kingdom', 'India', 'South Korea', 'France', 'Mexico', 'Global'];
 
-export const MOVIES = [
+export const FALLBACK_MOVIES = [
   { id: 'm1', title: 'Glass Horizon', desc: 'A satellite engineer must choose between the mission and her estranged brother stranded on the station.', rating: 8.1, genres: ['Sci-Fi', 'Drama'], partnerLiked: true },
   { id: 'm2', title: 'Late Ferry', desc: 'Two strangers share a night crossing after missing the last train home, and neither wants it to end.', rating: 7.4, genres: ['Romance', 'Drama'], partnerLiked: false },
   { id: 'm3', title: 'Static & Silence', desc: 'A retired hacker is pulled back in when her old crew resurfaces with one impossible last job.', rating: 7.8, genres: ['Thriller', 'Action'], partnerLiked: true },
@@ -13,9 +13,9 @@ export const MOVIES = [
 
 export const FRIENDS = [
   { id: 'partner', name: 'Jess Ko', username: '@jessko', status: 'partner' },
-  { id: 'f1', name: 'Sam Rivera', username: '@samr', status: 'connected', common: ['m1'] },
-  { id: 'f2', name: 'Priya N.', username: '@priyan', status: 'pending', common: [] },
-  { id: 'f3', name: 'Tomas Diaz', username: '@tomasd', status: 'connected', common: ['m3', 'm5'] },
+  { id: 'f1', name: 'Sam Rivera', username: '@samr', status: 'connected' },
+  { id: 'f2', name: 'Priya N.', username: '@priyan', status: 'pending' },
+  { id: 'f3', name: 'Tomas Diaz', username: '@tomasd', status: 'connected' },
 ];
 
 export const CONTACTS = ['Alex Chen', 'Maria Santos', 'Devon Blake'];
