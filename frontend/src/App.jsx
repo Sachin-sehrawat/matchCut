@@ -601,20 +601,18 @@ const SORT_MODE_LABELS = { foryou: 'For You', upcoming: 'Upcoming', latest: 'Lat
 
 function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwipe, undoDisabled, resetDeck, swipeLike, swipeMaybe, swipeDiscard, swipeSuper, descExpanded, toggleDesc, trailerMuted, toggleTrailerMute, trailerIframeRef, sortMode, changeSortMode }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '58px 18px 14px', boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)' }}>Discover</div>
-        <button onClick={undoSwipe} disabled={undoDisabled} style={{ border: '2px solid var(--color-divider)', background: 'transparent', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: undoDisabled ? 0.35 : 1, borderRadius: '50%' }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7M3 12V5m0 7h7" stroke="var(--color-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '14px 12px 8px', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', flex: 1, paddingBottom: 2 }}>
+          {Object.keys(SORT_MODE_LABELS).map((mode) => (
+            <button key={mode} style={{ ...chipStyle(sortMode === mode), padding: '5px 10px', font: '600 10.5px var(--font-body)', flex: 'none' }} onClick={() => changeSortMode(mode)}>
+              {SORT_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+        <button onClick={undoSwipe} disabled={undoDisabled} style={{ border: '2px solid var(--color-divider)', background: 'transparent', width: 30, height: 30, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: undoDisabled ? 0.35 : 1, borderRadius: '50%' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7M3 12V5m0 7h7" stroke="var(--color-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 }}>
-        {Object.keys(SORT_MODE_LABELS).map((mode) => (
-          <button key={mode} style={{ ...chipStyle(sortMode === mode), flex: 'none' }} onClick={() => changeSortMode(mode)}>
-            {SORT_MODE_LABELS[mode]}
-          </button>
-        ))}
       </div>
 
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -723,18 +721,18 @@ function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwi
       </div>
 
       {topCard && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, paddingTop: 16 }}>
-          <button onClick={swipeMaybe} style={{ width: 52, height: 52, border: '2px solid var(--color-neutral-500)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 12H5m0 0l6 6m-6-6l6-6" stroke="var(--color-neutral-700)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, paddingTop: 10 }}>
+          <button onClick={swipeMaybe} style={{ width: 44, height: 44, border: '2px solid var(--color-neutral-500)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M19 12H5m0 0l6 6m-6-6l6-6" stroke="var(--color-neutral-700)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={swipeDiscard} style={{ width: 52, height: 52, border: '2px solid var(--color-text)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--color-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <button onClick={swipeDiscard} style={{ width: 44, height: 44, border: '2px solid var(--color-text)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--color-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={swipeSuper} style={{ width: 52, height: 52, border: 'none', background: 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.9 6.6L22 9.3l-5.2 4.8L18.2 21 12 17.3 5.8 21l1.4-6.9L2 9.3l7.1-.7L12 2z" fill="#fff" /></svg>
+          <button onClick={swipeSuper} style={{ width: 44, height: 44, border: 'none', background: 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.9 6.6L22 9.3l-5.2 4.8L18.2 21 12 17.3 5.8 21l1.4-6.9L2 9.3l7.1-.7L12 2z" fill="#fff" /></svg>
           </button>
-          <button onClick={swipeLike} style={{ width: 52, height: 52, border: 'none', background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7.5-4.6-10-9.1C.5 8.1 2.3 4.5 6 4c2.1-.3 4 1 6 3.3C14 5 15.9 3.7 18 4c3.7.5 5.5 4.1 4 7.9C19.5 16.4 12 21 12 21z" fill="#fff" /></svg>
+          <button onClick={swipeLike} style={{ width: 44, height: 44, border: 'none', background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '50%' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7.5-4.6-10-9.1C.5 8.1 2.3 4.5 6 4c2.1-.3 4 1 6 3.3C14 5 15.9 3.7 18 4c3.7.5 5.5 4.1 4 7.9C19.5 16.4 12 21 12 21z" fill="#fff" /></svg>
           </button>
         </div>
       )}
@@ -796,7 +794,7 @@ function ProviderRow({ label, items }) {
 function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
-    <div style={{ position: 'absolute', inset: 0, padding: '58px 20px 14px', boxSizing: 'border-box', overflow: 'auto' }}>
+    <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Matches</div>
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 14, marginBottom: 14, borderBottom: '2px solid var(--color-divider)' }}>
         {friendChips.map((f) => (
@@ -840,7 +838,7 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
 
 function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, sentInvites, inviteError, contactsSupported, importContacts, pickedContacts, contactsStatus, contactsError, inviteContact, friends, onSelectFriend, promoteToPartner }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, padding: '58px 20px 14px', boxSizing: 'border-box', overflow: 'auto' }}>
+    <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Friends</div>
 
       <div className="field" style={{ marginBottom: 10 }}>
@@ -936,7 +934,7 @@ function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, pref
   const isFounder = user?.role === 'founder';
   const pct = Math.round((superlikesLeft / superlikeLimit) * 100);
   return (
-    <div style={{ position: 'absolute', inset: 0, padding: '58px 20px 14px', boxSizing: 'border-box', overflow: 'auto' }}>
+    <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 18 }}>Profile</div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
@@ -982,23 +980,23 @@ function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, pref
 
 function TabBar({ tab, setTab, tabColor, hasNewMatch }) {
   return (
-    <div style={{ display: 'flex', borderTop: '2px solid var(--color-divider)', background: 'var(--color-bg)', paddingBottom: 20 }}>
-      <button onClick={() => setTab('home')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, background: 'none', border: 'none', cursor: 'pointer' }}>
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" /><rect x="7" y="4" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" fill="var(--color-bg)" /></svg>
-        <span style={{ font: '700 10px var(--font-body)', color: tabColor('home') }}>Discover</span>
+    <div style={{ display: 'flex', borderTop: '2px solid var(--color-divider)', background: 'var(--color-bg)', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+      <button onClick={() => setTab('home')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" /><rect x="7" y="4" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" fill="var(--color-bg)" /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('home') }}>Discover</span>
       </button>
-      <button onClick={() => setTab('matches')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}>
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.3-9.3-8.5C1 8 2.6 4.8 6 4.4c2-.2 3.7 1 6 3.1 2.3-2.1 4-3.3 6-3.1 3.4.4 5 3.6 3.3 7.1C19 15.7 12 20 12 20z" stroke={tabColor('matches')} strokeWidth="2" /></svg>
-        <span style={{ font: '700 10px var(--font-body)', color: tabColor('matches') }}>Matches</span>
-        {hasNewMatch && <span style={{ position: 'absolute', top: 6, right: 24, width: 8, height: 8, background: 'var(--color-accent)', borderRadius: '50%' }} />}
+      <button onClick={() => setTab('matches')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.3-9.3-8.5C1 8 2.6 4.8 6 4.4c2-.2 3.7 1 6 3.1 2.3-2.1 4-3.3 6-3.1 3.4.4 5 3.6 3.3 7.1C19 15.7 12 20 12 20z" stroke={tabColor('matches')} strokeWidth="2" /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('matches') }}>Matches</span>
+        {hasNewMatch && <span style={{ position: 'absolute', top: 5, right: 24, width: 8, height: 8, background: 'var(--color-accent)', borderRadius: '50%' }} />}
       </button>
-      <button onClick={() => setTab('friends')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, background: 'none', border: 'none', cursor: 'pointer' }}>
-        <svg width="22" height="21" viewBox="0 0 24 24" fill="none"><circle cx="8.5" cy="8" r="3.2" stroke={tabColor('friends')} strokeWidth="2" /><circle cx="16" cy="9" r="2.6" stroke={tabColor('friends')} strokeWidth="2" /><path d="M2.5 19c.6-3.3 3-5 6-5s5.4 1.7 6 5" stroke={tabColor('friends')} strokeWidth="2" strokeLinecap="round" /><path d="M15 14.3c2.3.2 4 1.7 4.5 4.7" stroke={tabColor('friends')} strokeWidth="2" strokeLinecap="round" /></svg>
-        <span style={{ font: '700 10px var(--font-body)', color: tabColor('friends') }}>Friends</span>
+      <button onClick={() => setTab('friends')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <svg width="20" height="19" viewBox="0 0 24 24" fill="none"><circle cx="8.5" cy="8" r="3.2" stroke={tabColor('friends')} strokeWidth="2" /><circle cx="16" cy="9" r="2.6" stroke={tabColor('friends')} strokeWidth="2" /><path d="M2.5 19c.6-3.3 3-5 6-5s5.4 1.7 6 5" stroke={tabColor('friends')} strokeWidth="2" strokeLinecap="round" /><path d="M15 14.3c2.3.2 4 1.7 4.5 4.7" stroke={tabColor('friends')} strokeWidth="2" strokeLinecap="round" /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('friends') }}>Friends</span>
       </button>
-      <button onClick={() => setTab('profile')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, background: 'none', border: 'none', cursor: 'pointer' }}>
-        <svg width="19" height="21" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" stroke={tabColor('profile')} strokeWidth="2" /><path d="M4 20c1-4.4 4-6.5 8-6.5s7 2.1 8 6.5" stroke={tabColor('profile')} strokeWidth="2" strokeLinecap="round" /></svg>
-        <span style={{ font: '700 10px var(--font-body)', color: tabColor('profile') }}>Profile</span>
+      <button onClick={() => setTab('profile')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <svg width="17" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" stroke={tabColor('profile')} strokeWidth="2" /><path d="M4 20c1-4.4 4-6.5 8-6.5s7 2.1 8 6.5" stroke={tabColor('profile')} strokeWidth="2" strokeLinecap="round" /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('profile') }}>Profile</span>
       </button>
     </div>
   );
