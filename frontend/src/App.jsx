@@ -380,6 +380,15 @@ export default function App() {
     }
   };
 
+  const acceptInvite = async (friendId) => {
+    try {
+      await api.acceptFriend(friendId);
+      loadFriends();
+    } catch {
+      // best-effort; friend list simply won't reflect the change
+    }
+  };
+
   // — derived values —
   const superlikesLeft = Math.max(0, SUPERLIKE_LIMIT - superlikesUsed);
   const partnerFriend = friends.find((f) => f.status === 'partner');
@@ -483,6 +492,7 @@ export default function App() {
                   friends={friends}
                   onSelectFriend={(id) => { setActiveFriendId(id); setTab('matches'); }}
                   promoteToPartner={promoteToPartner}
+                  acceptInvite={acceptInvite}
                 />
               )}
               {tab === 'profile' && (
@@ -836,7 +846,7 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
   );
 }
 
-function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, sentInvites, inviteError, contactsSupported, importContacts, pickedContacts, contactsStatus, contactsError, inviteContact, friends, onSelectFriend, promoteToPartner }) {
+function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, sentInvites, inviteError, contactsSupported, importContacts, pickedContacts, contactsStatus, contactsError, inviteContact, friends, onSelectFriend, promoteToPartner, acceptInvite }) {
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Friends</div>
@@ -918,6 +928,13 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
                   style={{ background: 'none', border: '2px solid var(--color-accent)', color: 'var(--color-accent-700)', padding: '6px 12px', font: '700 10.5px var(--font-body)', cursor: 'pointer', borderRadius: 20, flex: 'none', marginLeft: 8, whiteSpace: 'nowrap' }}
                 >
                   Make partner
+                </button>
+              ) : fr.status === 'pending' ? (
+                <button
+                  onClick={() => acceptInvite(fr.id)}
+                  style={{ background: 'var(--color-accent)', border: 'none', color: '#fff', padding: '6px 12px', font: '700 10.5px var(--font-body)', cursor: 'pointer', borderRadius: 20, flex: 'none', marginLeft: 8, whiteSpace: 'nowrap' }}
+                >
+                  Accept
                 </button>
               ) : (
                 <span className={`tag ${tagClass}`} style={{ font: '700 9.5px var(--font-body)', flex: 'none', marginLeft: 8 }}>{statusLabel}</span>
