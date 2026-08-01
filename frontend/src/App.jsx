@@ -613,7 +613,7 @@ function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwi
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', padding: '14px 12px 8px', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', flex: 1, paddingBottom: 2 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
           {Object.keys(SORT_MODE_LABELS).map((mode) => (
             <button key={mode} style={{ ...chipStyle(sortMode === mode), padding: '5px 10px', font: '600 10.5px var(--font-body)', flex: 'none' }} onClick={() => changeSortMode(mode)}>
               {SORT_MODE_LABELS[mode]}
@@ -806,7 +806,7 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Matches</div>
-      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 14, marginBottom: 14, borderBottom: '2px solid var(--color-divider)' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', paddingBottom: 14, marginBottom: 14, borderBottom: '2px solid var(--color-divider)' }}>
         {friendChips.map((f) => (
           <button key={f.id} onClick={() => setActiveFriendId(f.id)} style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer' }}>
             <div style={{ width: 52, height: 52, background: avatarBgFor(String(f.id)), display: 'flex', alignItems: 'center', justifyContent: 'center', font: '800 16px var(--font-heading)', color: '#fff', border: f.id === activeFriendId ? '3px solid var(--color-accent)' : '3px solid transparent', borderRadius: '50%', overflow: 'hidden' }}>
