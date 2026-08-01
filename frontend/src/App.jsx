@@ -50,6 +50,9 @@ export default function App() {
 
   const [showMatch, setShowMatch] = useState(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [movieDetail, setMovieDetail] = useState(null);
+  const [movieDetailProviders, setMovieDetailProviders] = useState(null);
+  const [movieDetailProvidersLoading, setMovieDetailProvidersLoading] = useState(false);
 
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [usernameInput, setUsernameInput] = useState('');
@@ -389,6 +392,17 @@ export default function App() {
     }
   };
 
+  const openMovieDetail = (movie) => {
+    setMovieDetail(movie);
+    setMovieDetailProviders(null);
+    setMovieDetailProvidersLoading(true);
+    api.getWatchProviders(movie.id, regionsSel)
+      .then(setMovieDetailProviders)
+      .catch(() => setMovieDetailProviders({ region: null }))
+      .finally(() => setMovieDetailProvidersLoading(false));
+  };
+  const closeMovieDetail = () => setMovieDetail(null);
+
   // — derived values —
   const superlikesLeft = Math.max(0, SUPERLIKE_LIMIT - superlikesUsed);
   const partnerFriend = friends.find((f) => f.status === 'partner');
@@ -480,6 +494,7 @@ export default function App() {
                   friendChips={chipFriends}
                   activeFriendId={activeFriendId} setActiveFriendId={setActiveFriendId}
                   activeFriend={activeFriend} commonMovies={commonMovies}
+                  onSelectMovie={openMovieDetail}
                 />
               )}
               {tab === 'friends' && (
@@ -519,6 +534,9 @@ export default function App() {
         )}
         {showPaywall && (
           <PaywallModal superlikeLimit={SUPERLIKE_LIMIT} closePaywall={closePaywall} />
+        )}
+        {movieDetail && (
+          <MovieDetailModal movie={movieDetail} providers={movieDetailProviders} providersLoading={movieDetailProvidersLoading} onClose={closeMovieDetail} />
         )}
       </PhoneFrame>
     </div>
@@ -648,7 +666,20 @@ function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwi
                   ref={trailerIframeRef}
                   title="Trailer"
                   src={`https://www.youtube.com/embed/${topCard.trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&loop=1&playlist=${topCard.trailerKey}&enablejsapi=1`}
-                  allow="autoplay; encrypted-media"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  onLoad={(e) => {
+                    // Some mobile browsers ignore the autoplay/mute URL params
+                    // once embedded — reinforce via the player postMessage API
+                    // once the player has had time to initialize.
+                    const win = e.currentTarget.contentWindow;
+                    const nudge = () => {
+                      win?.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+                      win?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                    };
+                    nudge();
+                    setTimeout(nudge, 400);
+                    setTimeout(nudge, 1200);
+                  }}
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }}
                 />
               )}
@@ -759,7 +790,7 @@ function WatchProviders({ providersLoading, providers, movieTitle }) {
     return (
       <div style={{ marginTop: 8 }}>
         <div style={{ font: '400 11px var(--font-body)', color: 'rgba(255,255,255,.55)', marginBottom: 4 }}>No streaming info available in your region yet.</div>
-        <a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noreferrer" onMouseDown={(e) => e.stopPropagation()} style={{ font: '600 11px var(--font-body)', color: 'var(--color-accent)' }}>
+        <a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noreferrer" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} style={{ font: '600 11px var(--font-body)', color: 'var(--color-accent)' }}>
           Search Google →
         </a>
       </div>
@@ -772,7 +803,7 @@ function WatchProviders({ providersLoading, providers, movieTitle }) {
       <ProviderRow label="Rent" items={providers.rent} />
       <ProviderRow label="Buy" items={providers.buy} />
       {!hasAny && providers.link && (
-        <a href={providers.link} target="_blank" rel="noreferrer" onMouseDown={(e) => e.stopPropagation()} style={{ font: '600 11px var(--font-body)', color: 'var(--color-accent)' }}>
+        <a href={providers.link} target="_blank" rel="noreferrer" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} style={{ font: '600 11px var(--font-body)', color: 'var(--color-accent)' }}>
           See where to watch →
         </a>
       )}
@@ -801,7 +832,7 @@ function ProviderRow({ label, items }) {
   );
 }
 
-function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies }) {
+function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
@@ -827,16 +858,16 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
       {commonMovies.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {commonMovies.map((m) => (
-            <div key={m.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)' }}>
+            <button key={m.id} onClick={() => onSelectMovie(m)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)', background: 'none', border: 'none', borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-divider)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
               <div style={{ width: 56, height: 80, flex: 'none', background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative' }}>
                 <Poster id={m.id} src={m.posterUrl} radius={12} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center', minWidth: 0 }}>
                 <span className="tag tag-accent" style={{ alignSelf: 'flex-start', font: '700 9.5px var(--font-body)' }}>You both liked</span>
                 <span style={{ font: '800 15px var(--font-heading)', color: 'var(--color-text)' }}>{m.title}</span>
                 <span style={{ font: '400 12px var(--font-body)', color: 'var(--color-neutral-700)' }}>★ {m.rating} · {(m.genres || []).join(' · ')}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       ) : (
@@ -1045,6 +1076,73 @@ function MatchModalToast({ movie, partnerName, viewInMatches }) {
       <div style={{ width: 12, height: 12, background: 'var(--color-accent)', flex: 'none', borderRadius: '50%' }} />
       <div style={{ flex: 1, font: '600 12.5px/1.4 var(--font-body)' }}>You &amp; {partnerName || 'your partner'} both liked <strong>{movie.title}</strong></div>
       <button onClick={viewInMatches} style={{ background: 'none', border: 'none', color: 'var(--color-accent)', font: '700 12px var(--font-body)', cursor: 'pointer', flex: 'none' }}>VIEW</button>
+    </div>
+  );
+}
+
+function MovieDetailModal({ movie, providers, providersLoading, onClose }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 120, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: '100%', maxHeight: '86%', overflow: 'auto', background: 'var(--color-bg)', borderRadius: '24px 24px 0 0', boxSizing: 'border-box', padding: '18px 20px 28px' }}
+      >
+        <div style={{ width: 40, height: 4, background: 'var(--color-divider)', margin: '0 auto 16px', borderRadius: 4 }} />
+        <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+          <div style={{ width: 92, height: 132, flex: 'none', background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 14, position: 'relative' }}>
+            <Poster id={movie.id} src={movie.posterUrl} radius={14} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+            <span style={{ font: '800 19px/1.2 var(--font-heading)', color: 'var(--color-text)' }}>{movie.title}</span>
+            <span style={{ font: '700 13px var(--font-body)', color: 'var(--color-accent-700)', marginTop: 4 }}>★ {movie.rating}</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {(movie.genres || []).map((g) => (
+                <span key={g} className="tag tag-neutral" style={{ font: '700 9px var(--font-body)' }}>{g}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        {movie.desc && (
+          <div style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--color-text)', marginBottom: 16 }}>{movie.desc}</div>
+        )}
+        <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 8 }}>Where to watch</div>
+        {providersLoading ? (
+          <div style={{ font: '400 12px var(--font-body)', color: 'var(--color-neutral-700)' }}>Checking where to watch…</div>
+        ) : !providers || !providers.region ? (
+          <div>
+            <div style={{ font: '400 12px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 6 }}>No streaming info available in your region yet.</div>
+            <a href={`https://www.google.com/search?q=${encodeURIComponent(`where to watch ${movie.title}`)}`} target="_blank" rel="noreferrer" style={{ font: '600 12px var(--font-body)', color: 'var(--color-accent-700)' }}>Search Google →</a>
+          </div>
+        ) : (
+          <div>
+            <DetailProviderRow label="Stream" items={providers.flatrate} />
+            <DetailProviderRow label="Rent" items={providers.rent} />
+            <DetailProviderRow label="Buy" items={providers.buy} />
+            {!(providers.flatrate?.length || providers.rent?.length || providers.buy?.length) && providers.link && (
+              <a href={providers.link} target="_blank" rel="noreferrer" style={{ font: '600 12px var(--font-body)', color: 'var(--color-accent-700)' }}>See where to watch →</a>
+            )}
+          </div>
+        )}
+        <button className="btn btn-ghost btn-block" onClick={onClose} style={{ marginTop: 20 }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function DetailProviderRow({ label, items }) {
+  if (!items || !items.length) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <span style={{ font: '700 10px var(--font-body)', color: 'var(--color-neutral-700)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', minWidth: 44, flex: 'none' }}>{label}</span>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {items.slice(0, 8).map((p) => (
+          p.logoPath ? (
+            <img key={p.id} src={p.logoPath} alt={p.name} title={p.name} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover', flex: 'none' }} />
+          ) : (
+            <span key={p.id} title={p.name} style={{ font: '600 10px var(--font-body)', color: 'var(--color-text)', background: 'var(--color-neutral-100)', padding: '5px 8px', borderRadius: 7, flex: 'none' }}>{p.name}</span>
+          )
+        ))}
+      </div>
     </div>
   );
 }
