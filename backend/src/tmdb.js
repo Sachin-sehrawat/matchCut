@@ -232,7 +232,7 @@ export async function fetchWatchProviders(movieId, regions = []) {
   return { region: null };
 }
 
-export async function fetchTrailerKey(movieId) {
+async function fetchTrailerKeyFromTmdb(movieId) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) return null;
   const res = await fetchWithRetry(`${BASE_URL}/movie/${movieId}/videos?api_key=${apiKey}`).catch(() => null);
@@ -243,4 +243,31 @@ export async function fetchTrailerKey(movieId) {
     || videos.find((v) => v.site === 'YouTube' && v.type === 'Teaser')
     || videos.find((v) => v.site === 'YouTube');
   return video ? video.key : null;
+}
+
+// Fallback for when TMDB simply has no trailer video on file for a title
+// (common for smaller/regional releases) — searches YouTube directly instead.
+async function searchYouTubeTrailer(query) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey || !query) return null;
+
+  const params = new URLSearchParams({
+    part: 'snippet',
+    q: `${query} official trailer`,
+    type: 'video',
+    maxResults: '1',
+    key: apiKey,
+  });
+  const res = await fetchWithRetry(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`).catch(() => null);
+  if (!res || !res.ok) return null;
+  const json = await res.json();
+  return json.items?.[0]?.id?.videoId || null;
+}
+
+export async function fetchTrailerKey(movieId) {
+  const key = await fetchTrailerKeyFromTmdb(movieId);
+  if (key) return key;
+
+  const { rows } = await pool.query('SELECT title FROM movies WHERE tmdb_id = $1', [movieId]);
+  return searchYouTubeTrailer(rows[0]?.title);
 }
