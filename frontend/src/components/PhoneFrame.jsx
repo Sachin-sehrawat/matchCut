@@ -1,12 +1,6 @@
 function StatusBar() {
   return (
-    <div
-      style={{
-        display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
-        padding: '21px 24px 19px', boxSizing: 'border-box',
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, width: '100%',
-      }}
-    >
+    <div className="phone-frame-statusbar">
       <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
         <span style={{ fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590, fontSize: 17, lineHeight: '22px', color: '#000' }}>9:41</span>
       </div>
@@ -34,21 +28,14 @@ function StatusBar() {
 
 export default function PhoneFrame({ children }) {
   return (
-    <div
-      style={{
-        width: 390, height: 844, borderRadius: 48, overflow: 'hidden',
-        position: 'relative', background: '#F2F2F7', flex: 'none',
-        boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
-        fontFamily: '-apple-system, system-ui, sans-serif',
-      }}
-    >
-      <div style={{ position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)', width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50 }} />
+    <div className="phone-frame">
+      <div className="phone-frame-notch" />
       <StatusBar />
-      <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: 'var(--color-bg)' }}>
+      <div className="phone-frame-content">
         {children}
       </div>
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60, height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', paddingBottom: 8, pointerEvents: 'none' }}>
-        <div style={{ width: 139, height: 5, borderRadius: 100, background: 'rgba(0,0,0,0.25)' }} />
+      <div className="phone-frame-home-indicator">
+        <div className="phone-frame-home-indicator-bar" />
       </div>
     </div>
   );
