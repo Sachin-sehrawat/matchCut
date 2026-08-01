@@ -1,5 +1,5 @@
 export const GENRES = ['Action', 'Comedy', 'Drama', 'Sci-Fi', 'Horror', 'Romance', 'Thriller', 'Documentary', 'Animation', 'Fantasy'];
-export const LANGUAGES = ['English', 'Spanish', 'French', 'Korean', 'Hindi', 'Japanese'];
+export const LANGUAGES = ['English', 'Spanish', 'French', 'Korean', 'Hindi', 'Japanese', 'Telugu', 'Tamil', 'Kannada', 'Malayalam'];
 export const REGIONS = ['United States', 'United Kingdom', 'India', 'South Korea', 'France', 'Mexico', 'Global'];
 
 export const FALLBACK_MOVIES = [
@@ -10,15 +10,6 @@ export const FALLBACK_MOVIES = [
   { id: 'm5', title: 'Low Tide', desc: 'A small fishing town unravels after a decades-old secret washes ashore with the tide.', rating: 8.4, genres: ['Drama', 'Thriller'], partnerLiked: true },
   { id: 'm6', title: 'Nightshift Diner', desc: 'The odd-hours regulars keep an all-night diner running through a citywide blackout.', rating: 7.0, genres: ['Comedy'], partnerLiked: false },
 ];
-
-export const FRIENDS = [
-  { id: 'partner', name: 'Jess Ko', username: '@jessko', status: 'partner' },
-  { id: 'f1', name: 'Sam Rivera', username: '@samr', status: 'connected' },
-  { id: 'f2', name: 'Priya N.', username: '@priyan', status: 'pending' },
-  { id: 'f3', name: 'Tomas Diaz', username: '@tomasd', status: 'connected' },
-];
-
-export const CONTACTS = ['Alex Chen', 'Maria Santos', 'Devon Blake'];
 
 export function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 export function initials(name) { return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
