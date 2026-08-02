@@ -22,7 +22,11 @@ router.get('/', asyncHandler(async (req, res) => {
        JOIN swipes s2 ON s2.movie_id = s1.movie_id
        JOIN movies m ON m.tmdb_id = s1.movie_id
        WHERE s1.user_id = $1 AND s2.user_id = $2
-         AND s1.direction IN ('like', 'superlike') AND s2.direction IN ('like', 'superlike')`,
+         AND s1.direction IN ('like', 'superlike') AND s2.direction IN ('like', 'superlike')
+         AND NOT EXISTS (
+           SELECT 1 FROM dismissed_matches d
+           WHERE d.user_id = $1 AND d.friend_id = $2 AND d.movie_id = s1.movie_id
+         )`,
       [req.userId, f.id],
     );
     return { ...f, common };
@@ -96,6 +100,19 @@ router.post('/:id/partner', asyncHandler(async (req, res) => {
     [req.userId, friendId],
   );
 
+  res.json({ ok: true });
+}));
+
+// Hides a shared like from the caller's own Matches list with this friend.
+// Per-viewer: doesn't touch the friend's swipes or their view of the match.
+router.delete('/:id/matches/:movieId', asyncHandler(async (req, res) => {
+  const friendId = Number(req.params.id);
+  const { movieId } = req.params;
+  await pool.query(
+    `INSERT INTO dismissed_matches (user_id, friend_id, movie_id) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, friend_id, movie_id) DO NOTHING`,
+    [req.userId, friendId, movieId],
+  );
   res.json({ ok: true });
 }));
 

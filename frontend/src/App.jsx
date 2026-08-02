@@ -392,6 +392,17 @@ export default function App() {
     }
   };
 
+  const deleteMatch = async (friendId, movieId) => {
+    setFriends((list) => list.map((f) => (
+      f.id === friendId ? { ...f, common: f.common.filter((m) => m.id !== movieId) } : f
+    )));
+    try {
+      await api.deleteMatch(friendId, movieId);
+    } catch {
+      loadFriends();
+    }
+  };
+
   const openMovieDetail = (movie) => {
     setMovieDetail(movie);
     setMovieDetailProviders(null);
@@ -495,6 +506,7 @@ export default function App() {
                   activeFriendId={activeFriendId} setActiveFriendId={setActiveFriendId}
                   activeFriend={activeFriend} commonMovies={commonMovies}
                   onSelectMovie={openMovieDetail}
+                  onDeleteMatch={deleteMatch}
                 />
               )}
               {tab === 'friends' && (
@@ -832,7 +844,7 @@ function ProviderRow({ label, items }) {
   );
 }
 
-function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie }) {
+function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
@@ -858,16 +870,23 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
       {commonMovies.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {commonMovies.map((m) => (
-            <button key={m.id} onClick={() => onSelectMovie(m)} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)', background: 'none', border: 'none', borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-divider)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-              <div style={{ width: 56, height: 80, flex: 'none', background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative' }}>
-                <Poster id={m.id} src={m.posterUrl} radius={12} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center', minWidth: 0 }}>
-                <span className="tag tag-accent" style={{ alignSelf: 'flex-start', font: '700 9.5px var(--font-body)' }}>You both liked</span>
-                <span style={{ font: '800 15px var(--font-heading)', color: 'var(--color-text)' }}>{m.title}</span>
-                <span style={{ font: '400 12px var(--font-body)', color: 'var(--color-neutral-700)' }}>★ {m.rating} · {(m.genres || []).join(' · ')}</span>
-              </div>
-            </button>
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '12px 0', borderBottom: '1px solid var(--color-divider)' }}>
+              <button onClick={() => onSelectMovie(m)} style={{ display: 'flex', gap: 12, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', flex: 1, minWidth: 0, padding: 0 }}>
+                <div style={{ width: 56, height: 80, flex: 'none', background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative' }}>
+                  <Poster id={m.id} src={m.posterUrl} radius={12} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center', minWidth: 0 }}>
+                  <span className="tag tag-accent" style={{ alignSelf: 'flex-start', font: '700 9.5px var(--font-body)' }}>You both liked</span>
+                  <span style={{ font: '800 15px var(--font-heading)', color: 'var(--color-text)' }}>{m.title}</span>
+                  <span style={{ font: '400 12px var(--font-body)', color: 'var(--color-neutral-700)' }}>★ {m.rating} · {(m.genres || []).join(' · ')}</span>
+                </div>
+              </button>
+              <button
+                onClick={() => onDeleteMatch(activeFriend.id, m.id)}
+                aria-label="Remove match"
+                style={{ flex: 'none', width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--color-neutral-200)', color: 'var(--color-neutral-700)', font: '700 14px var(--font-body)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >✕</button>
+            </div>
           ))}
         </div>
       ) : (

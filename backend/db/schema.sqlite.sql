@@ -47,3 +47,11 @@ CREATE TABLE IF NOT EXISTS genre_preferences (
   dislikes INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, genre)
 );
+
+CREATE TABLE IF NOT EXISTS dismissed_matches (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL REFERENCES movies(tmdb_id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, friend_id, movie_id)
+);

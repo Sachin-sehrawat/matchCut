@@ -66,3 +66,6 @@ export function acceptFriend(friendId) {
 export function promotePartner(friendId) {
   return request(`/friends/${friendId}/partner`, { method: 'POST' });
 }
+export function deleteMatch(friendId, movieId) {
+  return request(`/friends/${friendId}/matches/${movieId}`, { method: 'DELETE' });
+}

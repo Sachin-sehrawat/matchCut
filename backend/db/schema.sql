@@ -60,3 +60,14 @@ CREATE TABLE IF NOT EXISTS genre_preferences (
   dislikes INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, genre)
 );
+
+-- A user hiding a shared like from their own Matches list with a given
+-- friend. Per-viewer only — it doesn't touch swipes/genre_preferences and
+-- has no effect on what the friend sees.
+CREATE TABLE IF NOT EXISTS dismissed_matches (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL REFERENCES movies(tmdb_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, friend_id, movie_id)
+);
