@@ -475,6 +475,15 @@ export default function App() {
     }
   };
 
+  const declineInvite = async (friendId) => {
+    try {
+      await api.declineFriend(friendId);
+      loadFriends();
+    } catch {
+      // best-effort; friend list simply won't reflect the change
+    }
+  };
+
   const deleteMatch = async (friendId, movieId) => {
     setFriends((list) => list.map((f) => (
       f.id === friendId ? { ...f, common: f.common.filter((m) => m.id !== movieId) } : f
@@ -592,7 +601,7 @@ export default function App() {
                   sortMode={sortMode} changeSortMode={changeSortMode}
                 />
               )}
-              {tab === 'browse' && <BrowseScreen friends={friends} />}
+              {tab === 'browse' && <BrowseScreen friends={friends} language={language} regions={regionsSel} />}
               {tab === 'matches' && (
                 <MatchesScreen
                   friendChips={chipFriends}
@@ -615,6 +624,7 @@ export default function App() {
                   onSelectFriend={(id) => { setActiveFriendId(id); setTab('matches'); }}
                   promoteToPartner={promoteToPartner}
                   acceptInvite={acceptInvite}
+                  declineInvite={declineInvite}
                 />
               )}
               {tab === 'profile' && (
@@ -1002,7 +1012,7 @@ function ProviderRow({ label, items, movieTitle }) {
 // TikTok-style vertical trailer feed (the "Browse" tab). Self-contained
 // (fetches its own trending list + trailers) since it doesn't interact with
 // the swipe deck/matching state at all — Browse is watch-only browsing.
-function BrowseScreen({ friends }) {
+function BrowseScreen({ friends, language, regions }) {
   const [movies, setMovies] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1025,11 +1035,14 @@ function BrowseScreen({ friends }) {
   };
 
   useEffect(() => {
-    api.getTrending(1)
+    setLoading(true);
+    setMovies([]);
+    setPage(1);
+    api.getTrending(1, { language, regions })
       .then(({ movies: m, totalPages: tp }) => { setMovies(m); setTotalPages(tp); })
       .catch(() => setMovies([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [language, regions]);
 
   // — track which reel is on screen —
   useEffect(() => {
@@ -1056,10 +1069,10 @@ function BrowseScreen({ friends }) {
   useEffect(() => {
     const movie = movies[activeIndex];
     if (!movie || providers[movie.id] !== undefined) return;
-    api.getWatchProviders(movie.id, [], { mediaType: movie.mediaType })
+    api.getWatchProviders(movie.id, regions, { mediaType: movie.mediaType })
       .then((result) => setProviders((p) => ({ ...p, [movie.id]: result })))
       .catch(() => setProviders((p) => ({ ...p, [movie.id]: { region: null } })));
-  }, [activeIndex, movies, providers]);
+  }, [activeIndex, movies, providers, regions]);
 
   // — infinite scroll: load the next page once nearing the end —
   useEffect(() => {
@@ -1067,7 +1080,7 @@ function BrowseScreen({ friends }) {
     if (activeIndex < movies.length - 3) return;
     setLoadingMore(true);
     const nextPage = page + 1;
-    api.getTrending(nextPage)
+    api.getTrending(nextPage, { language, regions })
       .then(({ movies: m, totalPages: tp }) => {
         setMovies((prev) => {
           const seen = new Set(prev.map((x) => x.id));
@@ -1078,7 +1091,7 @@ function BrowseScreen({ friends }) {
       })
       .catch(() => {})
       .finally(() => setLoadingMore(false));
-  }, [activeIndex, movies.length, page, totalPages, loadingMore]);
+  }, [activeIndex, movies.length, page, totalPages, loadingMore, language, regions]);
 
   if (loading) {
     return (
@@ -1146,8 +1159,12 @@ function useCoverSize(ref, ratio = 16 / 9) {
 
 function HeartIcon({ liked, size = 30 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={liked ? '#ff3b5c' : 'none'} stroke={liked ? '#ff3b5c' : '#fff'} strokeWidth="2">
-      <path d="M12 21s-7.5-4.6-10-9.2C.5 8.7 2 5 5.5 5c2 0 3.5 1.2 4.8 3.1C11.6 6.2 13 5 15 5c3.5 0 5 3.7 3.5 6.8C19.5 16.4 12 21 12 21z" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={liked ? '#ff3b5c' : 'none'} stroke={liked ? '#ff3b5c' : '#fff'} strokeWidth="1.8">
+      <path
+        d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -1275,8 +1292,8 @@ function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, 
       )}
 
       {showHeartBurst && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: 96, animation: 'heartBurst .8s ease-out' }}>❤️</span>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', animation: 'heartBurst .8s ease-out' }}>
+          <HeartIcon liked size={96} />
         </div>
       )}
 
@@ -1466,7 +1483,7 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
   );
 }
 
-function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, sentInvites, inviteError, contactsSupported, importContacts, pickedContacts, contactsStatus, contactsError, inviteContact, friends, onSelectFriend, promoteToPartner, acceptInvite }) {
+function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, sentInvites, inviteError, contactsSupported, importContacts, pickedContacts, contactsStatus, contactsError, inviteContact, friends, onSelectFriend, promoteToPartner, acceptInvite, declineInvite }) {
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
       <div style={{ font: '800 20px/1 var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Friends</div>
@@ -1530,7 +1547,11 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
         )}
         {friends.map((fr) => {
           const tagClass = fr.status === 'partner' ? 'tag-accent' : fr.status === 'pending' ? 'tag-outline' : 'tag-neutral';
-          const statusLabel = fr.status === 'partner' ? 'Partner' : fr.status === 'pending' ? 'Pending' : 'Connected';
+          // Pending is symmetric in the DB (a row on both sides) — `incoming`
+          // (from the backend, derived from who originally sent the invite)
+          // is what tells the recipient apart from the sender, so only the
+          // recipient sees Accept/Decline; the sender just sees "Pending".
+          const statusLabel = fr.status === 'partner' ? 'Partner' : fr.status === 'pending' ? (fr.incoming ? 'Wants to connect' : 'Pending') : 'Connected';
           return (
             <div key={fr.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-divider)' }}>
               <button onClick={() => onSelectFriend(fr.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, flex: 1, minWidth: 0 }}>
@@ -1549,13 +1570,21 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
                 >
                   Make partner
                 </button>
-              ) : fr.status === 'pending' ? (
-                <button
-                  onClick={() => acceptInvite(fr.id)}
-                  style={{ background: 'var(--color-accent)', border: 'none', color: '#fff', padding: '6px 12px', font: '700 10.5px var(--font-body)', cursor: 'pointer', borderRadius: 20, flex: 'none', marginLeft: 8, whiteSpace: 'nowrap' }}
-                >
-                  Accept
-                </button>
+              ) : fr.status === 'pending' && fr.incoming ? (
+                <div style={{ display: 'flex', gap: 6, flex: 'none', marginLeft: 8 }}>
+                  <button
+                    onClick={() => declineInvite(fr.id)}
+                    style={{ background: 'none', border: '2px solid var(--color-divider)', color: 'var(--color-neutral-700)', padding: '6px 12px', font: '700 10.5px var(--font-body)', cursor: 'pointer', borderRadius: 20, whiteSpace: 'nowrap' }}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    onClick={() => acceptInvite(fr.id)}
+                    style={{ background: 'var(--color-accent)', border: 'none', color: '#fff', padding: '6px 12px', font: '700 10.5px var(--font-body)', cursor: 'pointer', borderRadius: 20, whiteSpace: 'nowrap' }}
+                  >
+                    Accept
+                  </button>
+                </div>
               ) : (
                 <span className={`tag ${tagClass}`} style={{ font: '700 9.5px var(--font-body)', flex: 'none', marginLeft: 8 }}>{statusLabel}</span>
               )}

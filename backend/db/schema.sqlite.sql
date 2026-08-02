@@ -36,9 +36,12 @@ CREATE TABLE IF NOT EXISTS friendships (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('pending', 'connected', 'partner')),
+  requested_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (user_id, friend_id)
 );
+
+ALTER TABLE friendships ADD COLUMN IF NOT EXISTS requested_by INTEGER REFERENCES users(id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS genre_preferences (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -19,13 +19,16 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 }));
 
-// Powers the Browse tab — TMDB's global trending list (movies and TV shows),
-// independent of the caller's genre/language/region filters or swipe history
-// (Browse is watch-only browsing, not a swipeable deck).
+// Powers the Browse tab — popular movies/TV shows filtered by the caller's
+// onboarding language/region (see fetchTrendingAll), biased by genre
+// preference the same way Discover's "For You" deck is. Not filtered by
+// swipe history, since Browse is watch-only (not a swipeable deck).
 router.get('/trending', asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
+  const language = req.query.language || undefined;
+  const regions = req.query.regions ? String(req.query.regions).split(',').filter(Boolean) : [];
   try {
-    const { movies, totalPages } = await fetchTrendingAll({ page, userId: req.userId });
+    const { movies, totalPages } = await fetchTrendingAll({ page, userId: req.userId, language, regions });
     res.json({ movies, page, totalPages });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch trending', detail: err.message });

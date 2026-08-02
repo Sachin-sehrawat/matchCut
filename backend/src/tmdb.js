@@ -197,38 +197,57 @@ export async function fetchMovies({ genres = [], language, regions = [], userId,
   return movies;
 }
 
-// Independent of any user's onboarding genres/language/region filters — this
-// is TMDB's own global "trending this week" ranking (movies and TV shows
-// both), used to power the Browse tab's trailer feed. The order is biased
-// (not filtered) by the caller's per-genre preference scores the same way
-// Discover's "For You" deck is (see weightedShuffle/getGenreScores below) —
-// nothing is excluded, Browse still surfaces the same trending catalog for
-// everyone, liked genres just tend to surface nearer the top.
-export async function fetchTrendingAll({ page = 1, userId } = {}) {
+function mapDiscoverItem(r, mediaType) {
+  return {
+    id: String(r.id),
+    mediaType,
+    title: mediaType === 'tv' ? r.name : r.title,
+    desc: r.overview,
+    rating: Math.round((r.vote_average || 0) * 10) / 10,
+    // TV shows use a different TMDB genre-id namespace than movies (e.g.
+    // 10759 "Action & Adventure") which GENRE_LABELS doesn't cover, so TV
+    // items will often have an empty genres list — harmless, just no tags.
+    genres: (r.genre_ids || []).map((id) => GENRE_LABELS[id]).filter(Boolean),
+    posterUrl: r.poster_path ? IMAGE_BASE + r.poster_path : null,
+  };
+}
+
+// Popular movies + TV shows, filtered by the caller's onboarding
+// language/region and biased (not filtered) by their per-genre preference
+// scores the same way Discover's "For You" deck is (see
+// weightedShuffle/getGenreScores below) — this is what powers the Browse
+// tab's trailer feed. Unlike fetchMovies, only the *first* selected region
+// is used (no multi-region fan-out) to keep page-by-page infinite scroll
+// simple; discover/tv also has no `region` param, so region filtering there
+// uses `with_origin_country` instead.
+export async function fetchTrendingAll({ page = 1, userId, language, regions = [] } = {}) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) throw new Error('Missing TMDB_API_KEY');
 
-  const params = new URLSearchParams({ api_key: apiKey, page: String(page) });
-  const res = await fetchWithRetry(`${BASE_URL}/trending/all/week?${params.toString()}`);
-  if (!res.ok) throw new Error(`TMDB request failed: ${res.status}`);
-  const json = await res.json();
+  const langCode = language && LANGUAGE_CODES[language];
+  const regionCode = regions.length && REGION_CODES[regions[0]];
 
-  // /trending/all also returns media_type: 'person' (trending actors/crew) —
-  // not something Browse can show a trailer for, so drop those.
-  const items = (json.results || [])
-    .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-    .map((r) => ({
-      id: String(r.id),
-      mediaType: r.media_type,
-      title: r.media_type === 'tv' ? r.name : r.title,
-      desc: r.overview,
-      rating: Math.round((r.vote_average || 0) * 10) / 10,
-      // TV shows use a different TMDB genre-id namespace than movies (e.g.
-      // 10759 "Action & Adventure") which GENRE_LABELS doesn't cover, so TV
-      // items will often have an empty genres list — harmless, just no tags.
-      genres: (r.genre_ids || []).map((id) => GENRE_LABELS[id]).filter(Boolean),
-      posterUrl: r.poster_path ? IMAGE_BASE + r.poster_path : null,
-    }));
+  const movieParams = new URLSearchParams({ api_key: apiKey, page: String(page), sort_by: 'popularity.desc', include_adult: 'false' });
+  if (langCode) movieParams.set('with_original_language', langCode);
+  if (regionCode) movieParams.set('region', regionCode);
+
+  const tvParams = new URLSearchParams({ api_key: apiKey, page: String(page), sort_by: 'popularity.desc' });
+  if (langCode) tvParams.set('with_original_language', langCode);
+  if (regionCode) tvParams.set('with_origin_country', regionCode);
+
+  const [movieRes, tvRes] = await Promise.all([
+    fetchWithRetry(`${BASE_URL}/discover/movie?${movieParams.toString()}`),
+    fetchWithRetry(`${BASE_URL}/discover/tv?${tvParams.toString()}`),
+  ]);
+  if (!movieRes.ok && !tvRes.ok) throw new Error(`TMDB request failed: ${movieRes.status}/${tvRes.status}`);
+
+  const movieJson = movieRes.ok ? await movieRes.json() : { results: [], total_pages: 1 };
+  const tvJson = tvRes.ok ? await tvRes.json() : { results: [], total_pages: 1 };
+
+  const items = [
+    ...(movieJson.results || []).map((r) => mapDiscoverItem(r, 'movie')),
+    ...(tvJson.results || []).map((r) => mapDiscoverItem(r, 'tv')),
+  ];
 
   // Only movies go into the shared `movies` cache table (also used for
   // matching/swipes) — caching TV items there risks id collisions, since
@@ -237,7 +256,8 @@ export async function fetchTrendingAll({ page = 1, userId } = {}) {
 
   const genreScores = userId ? await getGenreScores(userId) : {};
   const ranked = weightedShuffle(items, genreScores);
-  return { movies: ranked, totalPages: json.total_pages || 1 };
+  const totalPages = Math.max(movieJson.total_pages || 1, tvJson.total_pages || 1);
+  return { movies: ranked, totalPages };
 }
 
 function mapProvider(p) {

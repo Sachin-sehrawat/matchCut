@@ -49,8 +49,11 @@ export async function getTrailerKey(movieId, { mediaType, title } = {}) {
   const { key } = await request(`/movies/${movieId}/trailer${qs ? `?${qs}` : ''}`);
   return key;
 }
-export async function getTrending(page = 1) {
-  const { movies, totalPages } = await request(`/movies/trending?page=${page}`);
+export async function getTrending(page = 1, { language, regions = [] } = {}) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (language) params.set('language', language);
+  if (regions.length) params.set('regions', regions.join(','));
+  const { movies, totalPages } = await request(`/movies/trending?${params.toString()}`);
   return { movies, totalPages };
 }
 export function getWatchProviders(movieId, regions = [], { mediaType } = {}) {
@@ -71,6 +74,9 @@ export function inviteFriend(identifier, asPartner = false) {
 }
 export function acceptFriend(friendId) {
   return request(`/friends/${friendId}/accept`, { method: 'POST' });
+}
+export function declineFriend(friendId) {
+  return request(`/friends/${friendId}/decline`, { method: 'POST' });
 }
 export function promotePartner(friendId) {
   return request(`/friends/${friendId}/partner`, { method: 'POST' });

@@ -46,9 +46,16 @@ CREATE TABLE IF NOT EXISTS friendships (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('pending', 'connected', 'partner')),
+  -- Who sent the invite (same value on both directions' rows). Lets the
+  -- recipient (requested_by != their own id) see Accept/Decline while the
+  -- sender just sees "Pending" — without this, both sides looked identical
+  -- and either could "accept" their own outgoing request.
+  requested_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, friend_id)
 );
+
+ALTER TABLE friendships ADD COLUMN IF NOT EXISTS requested_by INTEGER REFERENCES users(id) ON DELETE CASCADE;
 
 -- Per-genre taste record, built up from swipes (see src/preferences.js).
 -- 'like'/'superlike' increments likes, 'discard' increments dislikes,

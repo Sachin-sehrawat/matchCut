@@ -8,7 +8,9 @@ router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
   const { rows: friendships } = await pool.query(
-    `SELECT f.friend_id AS id, f.status, u.username, u.email
+    `SELECT f.friend_id AS id, f.status, u.username, u.email,
+            CASE WHEN f.status = 'pending' AND f.requested_by IS NOT NULL AND f.requested_by != $1
+                 THEN true ELSE false END AS incoming
      FROM friendships f
      JOIN users u ON u.id = f.friend_id
      WHERE f.user_id = $1`,
@@ -53,7 +55,7 @@ router.post('/invite', asyncHandler(async (req, res) => {
   const status = asPartner ? 'partner' : 'pending';
   try {
     await pool.query(
-      `INSERT INTO friendships (user_id, friend_id, status) VALUES ($1, $2, $3), ($2, $1, $3)`,
+      `INSERT INTO friendships (user_id, friend_id, status, requested_by) VALUES ($1, $2, $3, $1), ($2, $1, $3, $1)`,
       [req.userId, friend.id, status],
     );
   } catch (err) {
@@ -63,10 +65,24 @@ router.post('/invite', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Only the recipient (not whoever sent the invite) can accept it.
 router.post('/:id/accept', asyncHandler(async (req, res) => {
   const friendId = Number(req.params.id);
   await pool.query(
     `UPDATE friendships SET status = 'connected'
+     WHERE status = 'pending' AND requested_by != $1
+       AND ((user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1))`,
+    [req.userId, friendId],
+  );
+  res.json({ ok: true });
+}));
+
+// Declines (deletes) a pending invite — either side can do this (the
+// recipient turning it down, or the sender cancelling it).
+router.post('/:id/decline', asyncHandler(async (req, res) => {
+  const friendId = Number(req.params.id);
+  await pool.query(
+    `DELETE FROM friendships
      WHERE status = 'pending' AND ((user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1))`,
     [req.userId, friendId],
   );
