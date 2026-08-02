@@ -9,6 +9,44 @@ const TRAILER_DELAY_MS = 3000;
 const MATCH_CELEBRATION = 'full-screen'; // 'full-screen' | 'toast'
 const DIRECTION_MAP = { right: 'like', left: 'maybe', up: 'superlike', down: 'discard' };
 
+// Synthesized (no audio assets needed) — one short distinct tone per swipe
+// direction via Web Audio oscillators, created lazily so the first tone
+// only fires after a real user gesture (satisfies autoplay policy).
+let audioCtx = null;
+function getAudioCtx() {
+  if (typeof window === 'undefined') return null;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!audioCtx) audioCtx = new Ctx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTone(freqs, { duration = 0.1, type = 'sine', gain = 0.16 } = {}) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  freqs.forEach((freq, i) => {
+    const start = now + i * duration;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.linearRampToValueAtTime(gain, start + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + duration + 0.02);
+  });
+}
+const SWIPE_SOUNDS = {
+  right: () => playTone([660, 880], { type: 'triangle', duration: 0.09 }),
+  left: () => playTone([440], { type: 'sine', duration: 0.14 }),
+  down: () => playTone([320, 180], { type: 'sawtooth', duration: 0.11 }),
+  up: () => playTone([700, 950, 1300], { type: 'triangle', duration: 0.07 }),
+};
+function playSwipeSound(dir) { SWIPE_SOUNDS[dir]?.(); }
+
 const chipStyle = (selected) => selected
   ? { background: 'var(--color-accent)', color: '#fff', padding: '8px 14px', cursor: 'pointer', border: 'none', font: '600 12px var(--font-body)' }
   : { background: 'transparent', color: 'var(--color-text)', border: '2px solid var(--color-divider)', padding: '6px 12px', cursor: 'pointer', font: '600 12px var(--font-body)' };
@@ -194,6 +232,7 @@ export default function App() {
     const prevDeckIndex = stateRef.current.deckIndex;
     const movie = stateRef.current.movies[prevDeckIndex];
     const wasLiked = dir === 'right' || dir === 'up';
+    playSwipeSound(dir);
     setExitDir(dir);
     setDragging(false);
     setTimeout(() => {
@@ -696,10 +735,10 @@ function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwi
                 />
               )}
 
-              <div style={{ position: 'absolute', top: 16, left: 16, font: '800 22px var(--font-heading)', color: '#fff', padding: '6px 10px', border: '2px solid #fff', borderRadius: 10, transform: 'rotate(-14deg)', opacity: topCard.likeOpacity }}>LIKE</div>
-              <div style={{ position: 'absolute', top: 16, right: 16, font: '800 22px var(--font-heading)', color: '#fff', padding: '6px 10px', border: '2px solid #fff', borderRadius: 10, transform: 'rotate(14deg)', opacity: topCard.maybeOpacity }}>MAYBE</div>
-              <div style={{ position: 'absolute', bottom: 120, left: 16, font: '800 22px var(--font-heading)', color: '#fff', padding: '6px 10px', border: '2px solid #fff', borderRadius: 10, opacity: topCard.superOpacity }}>SUPERLIKE</div>
-              <div style={{ position: 'absolute', bottom: 120, right: 16, font: '800 22px var(--font-heading)', color: '#fff', padding: '6px 10px', border: '2px solid #fff', borderRadius: 10, opacity: topCard.nopeOpacity }}>DISCARD</div>
+              <SwipeStamp label="LIKE" color="#3ddc84" opacity={topCard.likeOpacity} rotate={-14} />
+              <SwipeStamp label="MAYBE" color="#ffc93c" opacity={topCard.maybeOpacity} rotate={14} />
+              <SwipeStamp label="SUPER LIKE" color="#4da6ff" opacity={topCard.superOpacity} rotate={0} />
+              <SwipeStamp label="DISCARD" color="#ff5252" opacity={topCard.nopeOpacity} rotate={0} />
 
               {topCard.showTrailer && (
                 <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(0,0,0,.55)', padding: '6px 8px 6px 12px', border: '1px solid rgba(255,255,255,.4)', borderRadius: 20 }}>
@@ -789,6 +828,24 @@ function DiscoverScreen({ topCard, stackCards, moviesLoading, startDrag, undoSwi
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SwipeStamp({ label, color, opacity, rotate = 0 }) {
+  return (
+    <div
+      style={{
+        position: 'absolute', top: '50%', left: '50%', zIndex: 5, pointerEvents: 'none',
+        transform: `translate(-50%, -50%) rotate(${rotate}deg)`,
+        font: '900 32px var(--font-heading)', letterSpacing: '.05em',
+        color, background: 'rgba(0,0,0,.35)', padding: '10px 22px',
+        border: `4px solid ${color}`, borderRadius: 14,
+        textShadow: '0 2px 8px rgba(0,0,0,.5)', whiteSpace: 'nowrap',
+        opacity,
+      }}
+    >
+      {label}
     </div>
   );
 }
