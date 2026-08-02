@@ -53,9 +53,10 @@ export async function getTrending(page = 1) {
   const { movies, totalPages } = await request(`/movies/trending?page=${page}`);
   return { movies, totalPages };
 }
-export function getWatchProviders(movieId, regions = []) {
+export function getWatchProviders(movieId, regions = [], { mediaType } = {}) {
   const params = new URLSearchParams();
   if (regions.length) params.set('regions', regions.join(','));
+  if (mediaType) params.set('type', mediaType);
   return request(`/movies/${movieId}/providers?${params.toString()}`);
 }
 export function submitSwipe({ movieId, direction }) {

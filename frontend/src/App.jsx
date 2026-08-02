@@ -994,9 +994,19 @@ function BrowseScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [trailerKeys, setTrailerKeys] = useState({});
+  const [providers, setProviders] = useState({});
   const [muted, setMuted] = useState(true);
+  const [likedIds, setLikedIds] = useState(() => new Set());
   const itemRefs = useRef(new Map());
   const observerRef = useRef(null);
+
+  const toggleLike = (movieId) => {
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(movieId)) next.delete(movieId); else next.add(movieId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     api.getTrending(1)
@@ -1025,6 +1035,15 @@ function BrowseScreen() {
       .then((key) => setTrailerKeys((k) => ({ ...k, [movie.id]: key || null })))
       .catch(() => setTrailerKeys((k) => ({ ...k, [movie.id]: null })));
   }, [activeIndex, movies, trailerKeys]);
+
+  // — lazily fetch where-to-watch providers for the reel currently on screen —
+  useEffect(() => {
+    const movie = movies[activeIndex];
+    if (!movie || providers[movie.id] !== undefined) return;
+    api.getWatchProviders(movie.id, [], { mediaType: movie.mediaType })
+      .then((result) => setProviders((p) => ({ ...p, [movie.id]: result })))
+      .catch(() => setProviders((p) => ({ ...p, [movie.id]: { region: null } })));
+  }, [activeIndex, movies, providers]);
 
   // — infinite scroll: load the next page once nearing the end —
   useEffect(() => {
@@ -1068,8 +1087,11 @@ function BrowseScreen() {
           movie={movie}
           active={i === activeIndex}
           trailerKey={trailerKeys[movie.id]}
+          providers={providers[movie.id]}
           muted={muted}
           toggleMuted={() => setMuted((v) => !v)}
+          liked={likedIds.has(movie.id)}
+          onToggleLike={() => toggleLike(movie.id)}
           registerRef={(el) => {
             if (el) { el.dataset.index = i; itemRefs.current.set(movie.id, el); }
             else itemRefs.current.delete(movie.id);
@@ -1105,24 +1127,69 @@ function useCoverSize(ref, ratio = 16 / 9) {
   return box;
 }
 
-function BrowseItem({ movie, active, trailerKey, muted, toggleMuted, registerRef }) {
+function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, liked, onToggleLike, registerRef }) {
   const boxRef = useRef(null);
   const { width, height } = useCoverSize(boxRef);
+  const [showHeartBurst, setShowHeartBurst] = useState(false);
+  const [shareToast, setShareToast] = useState(false);
+  const tapTimer = useRef(null);
+
+  const burstLike = () => {
+    if (!liked) onToggleLike();
+    setShowHeartBurst(true);
+    setTimeout(() => setShowHeartBurst(false), 800);
+  };
+
+  // Single tap toggles mute (after a short wait, in case a second tap
+  // follows); a second tap within that window is a double-tap-to-like
+  // instead, and cancels the pending mute toggle.
+  const handleTap = () => {
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+      tapTimer.current = null;
+      burstLike();
+    } else {
+      tapTimer.current = setTimeout(() => {
+        tapTimer.current = null;
+        toggleMuted();
+      }, 250);
+    }
+  };
+
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    const url = `https://www.themoviedb.org/${movie.mediaType === 'tv' ? 'tv' : 'movie'}/${movie.id}`;
+    const shareData = { title: movie.title, text: `Check out ${movie.title} on MatchCut`, url };
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 1600);
+    }
+  };
+
+  const providerItems = providers ? [...(providers.flatrate || []), ...(providers.rent || []), ...(providers.buy || [])].slice(0, 4) : [];
+
   return (
     <div
       ref={(el) => { boxRef.current = el; registerRef(el); }}
-      onClick={toggleMuted}
+      onClick={handleTap}
       style={{ position: 'relative', width: '100%', height: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', background: '#000' }}
     >
       <Poster id={movie.id} src={movie.posterUrl} radius={0} />
       <div style={{ position: 'absolute', inset: 0, backdropFilter: 'blur(30px)', background: 'rgba(0,0,0,.35)' }} />
       {active && trailerKey && width > 0 && (
+        // pointerEvents: 'none' — a cross-origin iframe otherwise swallows
+        // every tap into its own document before it can bubble to our
+        // onClick below, so single/double-tap (mute/like) would silently
+        // stop working the moment the trailer loaded and covered the tile.
         <iframe
           key={trailerKey}
           src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&controls=0&modestbranding=1&playsinline=1&loop=1&playlist=${trailerKey}`}
           title={movie.title}
           allow="autoplay; encrypted-media; picture-in-picture"
-          style={{ position: 'absolute', top: '50%', left: '50%', width, height, transform: 'translate(-50%, -50%)', border: 'none' }}
+          style={{ position: 'absolute', top: '50%', left: '50%', width, height, transform: 'translate(-50%, -50%)', border: 'none', pointerEvents: 'none' }}
         />
       )}
       {active && trailerKey === null && (
@@ -1148,6 +1215,50 @@ function BrowseItem({ movie, active, trailerKey, muted, toggleMuted, registerRef
       {active && (
         <div style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 12px var(--font-body)', color: '#fff' }}>
           {muted ? '🔇' : '🔊'}
+        </div>
+      )}
+
+      {showHeartBurst && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <span style={{ fontSize: 96, animation: 'heartBurst .8s ease-out' }}>❤️</span>
+        </div>
+      )}
+
+      {/* Instagram-style right-side action rail: like + share, with
+          streaming-service shortcuts underneath. */}
+      <div style={{ position: 'absolute', right: 12, bottom: 190, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 6 }}>
+        <button onClick={(e) => { e.stopPropagation(); onToggleLike(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <span style={{ fontSize: 30 }}>{liked ? '❤️' : '🤍'}</span>
+        </button>
+        <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <span style={{ fontSize: 26 }}>↗️</span>
+        </button>
+        {providerItems.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            {providerItems.map((p) => (
+              <a
+                key={p.id}
+                href={providerLinkFor(p.name, movie.title)}
+                target="_blank"
+                rel="noreferrer"
+                title={p.name}
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: 32, height: 32, borderRadius: 9, overflow: 'hidden', display: 'block', border: '1.5px solid rgba(255,255,255,.6)' }}
+              >
+                {p.logoPath ? (
+                  <img src={p.logoPath} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <span style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.2)', font: '700 9px var(--font-body)', color: '#fff' }}>{p.name[0]}</span>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {shareToast && (
+        <div style={{ position: 'absolute', left: '50%', bottom: 190, transform: 'translateX(-50%)', background: 'rgba(0,0,0,.75)', color: '#fff', padding: '8px 14px', borderRadius: 20, font: '600 11.5px var(--font-body)' }}>
+          Link copied
         </div>
       )}
     </div>

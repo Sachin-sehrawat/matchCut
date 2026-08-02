@@ -41,7 +41,8 @@ router.get('/:id/trailer', asyncHandler(async (req, res) => {
 
 router.get('/:id/providers', asyncHandler(async (req, res) => {
   const regions = req.query.regions ? String(req.query.regions).split(',').filter(Boolean) : [];
-  const providers = await fetchWatchProviders(req.params.id, regions).catch(() => ({ region: null }));
+  const mediaType = req.query.type === 'tv' ? 'tv' : 'movie';
+  const providers = await fetchWatchProviders(req.params.id, regions, mediaType).catch(() => ({ region: null }));
   res.json(providers);
 }));
 

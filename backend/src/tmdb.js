@@ -249,11 +249,12 @@ function mapProvider(p) {
 // caller's regions (in their preferred order) that actually has data —
 // falling back through the list rather than requiring an exact match on
 // the first region. Returns { region: null } if none of them have data.
-export async function fetchWatchProviders(movieId, regions = []) {
+export async function fetchWatchProviders(movieId, regions = [], mediaType = 'movie') {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) return { region: null };
 
-  const res = await fetchWithRetry(`${BASE_URL}/movie/${movieId}/watch/providers?api_key=${apiKey}`).catch(() => null);
+  const path = mediaType === 'tv' ? 'tv' : 'movie';
+  const res = await fetchWithRetry(`${BASE_URL}/${path}/${movieId}/watch/providers?api_key=${apiKey}`).catch(() => null);
   if (!res || !res.ok) return { region: null };
   const json = await res.json();
   const allResults = json.results || {};
