@@ -21,6 +21,10 @@ The frontend has no direct access to TMDB or either database — it only talks t
 - **Local dev without Docker:** run Postgres (and, optionally, MongoDB) yourself (or `docker compose up db mongo`), copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `frontend/.env`, then `npm install && npm run dev` in each of `backend/` and `frontend/` separately. The frontend dev server calls the backend directly via `VITE_API_URL`; the backend allows all origins via `cors()` for this case.
 - Neither service has a test suite or linter configured; `npm run build` in `frontend/` is the fastest way to typecheck/lint-by-compile.
 
+### Custom domain + HTTPS
+
+`docker-compose.yml` has a `caddy` service (Caddy 2, config in the root `Caddyfile`) that reverse-proxies `DOMAIN` (set in `.env`) to `frontend:80` and automatically obtains/renews a free Let's Encrypt certificate — no certbot/manual renewal needed. It publishes `80`/`443`; `frontend`'s own `8080:80` mapping is left in place alongside it as a fallback (and so nothing breaks before DNS/TLS is confirmed working) — safe to remove once the domain is live, along with the matching GCP firewall rule for 8080. Requires `DOMAIN` to already resolve to the host's public IP (e.g. a No-IP A record pointed at a **static** GCP external IP — an ephemeral one will change under Caddy and break the cert) before Caddy can issue a real certificate; with `DOMAIN` unset it falls back to `localhost` and issues from its own local (non-trusted) CA instead, which is enough to verify the proxy chain works but not for real browser access.
+
 ### `frontend/`
 
 Single-screen React app rendering an iPhone-framed mockup. No router — `src/App.jsx` is a single top-level `App` component owning all UI state (screen, tab, swipe-deck/drag state, onboarding selections, auth form) and passing derived data + handlers down as props to screen sub-components defined in the same file (`LoginScreen`, `OnboardingScreen`, `DiscoverScreen`, `MatchesScreen`, `FriendsScreen`, `ProfileScreen`, `TabBar`, `MatchModalFull`/`MatchModalToast`, `PaywallModal`).

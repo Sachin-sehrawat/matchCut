@@ -58,9 +58,34 @@ services:
     depends_on:
       - backend
     ports:
+      # Kept for direct IP:8080 access/fallback alongside Caddy below. Once
+      # DNS + HTTPS via Caddy are confirmed working, this can be removed
+      # (and the matching GCP firewall rule for 8080 closed) so the app is
+      # only reachable through Caddy on 80/443.
       - '8080:80'
+
+  # Reverse proxy in front of `frontend`, terminating TLS with a free,
+  # auto-renewing Let's Encrypt certificate for $DOMAIN (see .env.example).
+  # Requires DOMAIN to resolve to this host's public IP before it can issue
+  # a real certificate — see "Custom domain + HTTPS" in CLAUDE.md.
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
 
 volumes:
   db_data:
   mongo_data:
   backend_data:
+  caddy_data:
+  caddy_config:
