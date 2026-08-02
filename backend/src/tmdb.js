@@ -198,29 +198,41 @@ export async function fetchMovies({ genres = [], language, regions = [], userId,
 }
 
 // Independent of any user's onboarding genres/language/region or swipe
-// history — this is TMDB's own global "trending this week" ranking, used to
-// power the Reels tab's trailer feed. Unlike fetchMovies, nothing here is
-// filtered or biased per-user since Reels is watch-only (no swipe actions).
-export async function fetchTrendingMovies({ page = 1 } = {}) {
+// history — this is TMDB's own global "trending this week" ranking (movies
+// and TV shows both), used to power the Browse tab's trailer feed. Unlike
+// fetchMovies, nothing here is filtered or biased per-user since Browse is
+// watch-only (no swipe actions).
+export async function fetchTrendingAll({ page = 1 } = {}) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) throw new Error('Missing TMDB_API_KEY');
 
   const params = new URLSearchParams({ api_key: apiKey, page: String(page) });
-  const res = await fetchWithRetry(`${BASE_URL}/trending/movie/week?${params.toString()}`);
+  const res = await fetchWithRetry(`${BASE_URL}/trending/all/week?${params.toString()}`);
   if (!res.ok) throw new Error(`TMDB request failed: ${res.status}`);
   const json = await res.json();
 
-  const movies = (json.results || []).map((r) => ({
-    id: String(r.id),
-    title: r.title,
-    desc: r.overview,
-    rating: Math.round((r.vote_average || 0) * 10) / 10,
-    genres: (r.genre_ids || []).map((id) => GENRE_LABELS[id]).filter(Boolean),
-    posterUrl: r.poster_path ? IMAGE_BASE + r.poster_path : null,
-  }));
+  // /trending/all also returns media_type: 'person' (trending actors/crew) —
+  // not something Browse can show a trailer for, so drop those.
+  const items = (json.results || [])
+    .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+    .map((r) => ({
+      id: String(r.id),
+      mediaType: r.media_type,
+      title: r.media_type === 'tv' ? r.name : r.title,
+      desc: r.overview,
+      rating: Math.round((r.vote_average || 0) * 10) / 10,
+      // TV shows use a different TMDB genre-id namespace than movies (e.g.
+      // 10759 "Action & Adventure") which GENRE_LABELS doesn't cover, so TV
+      // items will often have an empty genres list — harmless, just no tags.
+      genres: (r.genre_ids || []).map((id) => GENRE_LABELS[id]).filter(Boolean),
+      posterUrl: r.poster_path ? IMAGE_BASE + r.poster_path : null,
+    }));
 
-  await upsertMovies(movies);
-  return { movies, totalPages: json.total_pages || 1 };
+  // Only movies go into the shared `movies` cache table (also used for
+  // matching/swipes) — caching TV items there risks id collisions, since
+  // TMDB movie ids and tv ids are separate namespaces that can overlap.
+  await upsertMovies(items.filter((m) => m.mediaType === 'movie'));
+  return { movies: items, totalPages: json.total_pages || 1 };
 }
 
 function mapProvider(p) {
@@ -258,10 +270,11 @@ export async function fetchWatchProviders(movieId, regions = []) {
   return { region: null };
 }
 
-async function fetchTrailerKeyFromTmdb(movieId) {
+async function fetchTrailerKeyFromTmdb(movieId, mediaType = 'movie') {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) return null;
-  const res = await fetchWithRetry(`${BASE_URL}/movie/${movieId}/videos?api_key=${apiKey}`).catch(() => null);
+  const path = mediaType === 'tv' ? 'tv' : 'movie';
+  const res = await fetchWithRetry(`${BASE_URL}/${path}/${movieId}/videos?api_key=${apiKey}`).catch(() => null);
   if (!res || !res.ok) return null;
   const json = await res.json();
   const videos = json.results || [];
@@ -290,10 +303,18 @@ async function searchYouTubeTrailer(query) {
   return json.items?.[0]?.id?.videoId || null;
 }
 
-export async function fetchTrailerKey(movieId) {
-  const key = await fetchTrailerKeyFromTmdb(movieId);
+// `title` lets callers that already have it (e.g. the Browse feed, which
+// only caches movie items — not TV — in the `movies` table) skip the DB
+// lookup; Discover's swipe deck omits it and falls back to that lookup,
+// unchanged from before.
+export async function fetchTrailerKey(movieId, { mediaType = 'movie', title } = {}) {
+  const key = await fetchTrailerKeyFromTmdb(movieId, mediaType);
   if (key) return key;
 
-  const { rows } = await pool.query('SELECT title FROM movies WHERE tmdb_id = $1', [movieId]);
-  return searchYouTubeTrailer(rows[0]?.title);
+  let query = title;
+  if (!query) {
+    const { rows } = await pool.query('SELECT title FROM movies WHERE tmdb_id = $1', [movieId]);
+    query = rows[0]?.title;
+  }
+  return searchYouTubeTrailer(query);
 }

@@ -41,8 +41,12 @@ export async function getMovies({ genres = [], language, regions = [], sort = 'f
   const { movies } = await request(`/movies?${params.toString()}`);
   return movies;
 }
-export async function getTrailerKey(movieId) {
-  const { key } = await request(`/movies/${movieId}/trailer`);
+export async function getTrailerKey(movieId, { mediaType, title } = {}) {
+  const params = new URLSearchParams();
+  if (mediaType) params.set('type', mediaType);
+  if (title) params.set('title', title);
+  const qs = params.toString();
+  const { key } = await request(`/movies/${movieId}/trailer${qs ? `?${qs}` : ''}`);
   return key;
 }
 export async function getTrending(page = 1) {

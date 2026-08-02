@@ -53,7 +53,7 @@ const chipStyle = (selected) => selected
 
 export default function App() {
   const [screen, setScreen] = useState('login'); // login | onboarding | app
-  const [tab, setTab] = useState('home'); // home | matches | friends | profile
+  const [tab, setTab] = useState('home'); // home | browse | matches | friends | profile
   const [restoring, setRestoring] = useState(true);
 
   const [user, setUser] = useState(null);
@@ -577,7 +577,7 @@ export default function App() {
                   sortMode={sortMode} changeSortMode={changeSortMode}
                 />
               )}
-              {tab === 'reels' && <ReelsScreen />}
+              {tab === 'browse' && <BrowseScreen />}
               {tab === 'matches' && (
                 <MatchesScreen
                   friendChips={chipFriends}
@@ -983,10 +983,10 @@ function ProviderRow({ label, items, movieTitle }) {
   );
 }
 
-// TikTok-style vertical trailer feed. Self-contained (fetches its own
-// trending list + trailers) since it doesn't interact with the swipe
-// deck/matching state at all — Reels is watch-only browsing.
-function ReelsScreen() {
+// TikTok-style vertical trailer feed (the "Browse" tab). Self-contained
+// (fetches its own trending list + trailers) since it doesn't interact with
+// the swipe deck/matching state at all — Browse is watch-only browsing.
+function BrowseScreen() {
   const [movies, setMovies] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1021,7 +1021,7 @@ function ReelsScreen() {
   useEffect(() => {
     const movie = movies[activeIndex];
     if (!movie || trailerKeys[movie.id] !== undefined) return;
-    api.getTrailerKey(movie.id)
+    api.getTrailerKey(movie.id, { mediaType: movie.mediaType, title: movie.title })
       .then((key) => setTrailerKeys((k) => ({ ...k, [movie.id]: key || null })))
       .catch(() => setTrailerKeys((k) => ({ ...k, [movie.id]: null })));
   }, [activeIndex, movies, trailerKeys]);
@@ -1048,22 +1048,22 @@ function ReelsScreen() {
   if (loading) {
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)' }}>Loading reels…</span>
+        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)' }}>Loading…</span>
       </div>
     );
   }
   if (!movies.length) {
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)', textAlign: 'center' }}>Couldn't load trending trailers right now.</span>
+        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)', textAlign: 'center' }}>Couldn't load trending titles right now.</span>
       </div>
     );
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', background: '#000' }}>
+    <div className="no-scrollbar" style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', background: '#000' }}>
       {movies.map((movie, i) => (
-        <ReelItem
+        <BrowseItem
           key={movie.id}
           movie={movie}
           active={i === activeIndex}
@@ -1105,7 +1105,7 @@ function useCoverSize(ref, ratio = 16 / 9) {
   return box;
 }
 
-function ReelItem({ movie, active, trailerKey, muted, toggleMuted, registerRef }) {
+function BrowseItem({ movie, active, trailerKey, muted, toggleMuted, registerRef }) {
   const boxRef = useRef(null);
   const { width, height } = useCoverSize(boxRef);
   return (
@@ -1133,6 +1133,9 @@ function ReelItem({ movie, active, trailerKey, muted, toggleMuted, registerRef }
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '60px 18px 26px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))' }}>
         <div style={{ font: '800 19px/1.2 var(--font-heading)', color: '#fff', marginBottom: 6 }}>{movie.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {movie.mediaType === 'tv' && (
+            <span style={{ font: '700 9.5px var(--font-body)', color: '#fff', background: 'var(--color-accent)', padding: '3px 8px', borderRadius: 20 }}>SERIES</span>
+          )}
           <span style={{ font: '700 12px var(--font-body)', color: '#fff' }}>★ {movie.rating}</span>
           {(movie.genres || []).slice(0, 3).map((g) => (
             <span key={g} style={{ font: '600 9.5px var(--font-body)', color: '#fff', background: 'rgba(255,255,255,.18)', padding: '3px 8px', borderRadius: 20 }}>{g}</span>
@@ -1402,9 +1405,9 @@ function TabBar({ tab, setTab, tabColor, hasNewMatch }) {
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" /><rect x="7" y="4" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" fill="var(--color-bg)" /></svg>
         <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('home') }}>Discover</span>
       </button>
-      <button onClick={() => setTab('reels')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
-        <svg width="18" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke={tabColor('reels')} strokeWidth="2" /><path d="M10 8.5v7l6-3.5-6-3.5z" fill={tabColor('reels')} /></svg>
-        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('reels') }}>Reels</span>
+      <button onClick={() => setTab('browse')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <svg width="18" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke={tabColor('browse')} strokeWidth="2" /><path d="M10 8.5v7l6-3.5-6-3.5z" fill={tabColor('browse')} /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('browse') }}>Browse</span>
       </button>
       <button onClick={() => setTab('matches')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.3-9.3-8.5C1 8 2.6 4.8 6 4.4c2-.2 3.7 1 6 3.1 2.3-2.1 4-3.3 6-3.1 3.4.4 5 3.6 3.3 7.1C19 15.7 12 20 12 20z" stroke={tabColor('matches')} strokeWidth="2" /></svg>

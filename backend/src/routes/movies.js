@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
-import { fetchMovies, fetchTrailerKey, fetchWatchProviders, fetchTrendingMovies, SORT_MODES } from '../tmdb.js';
+import { fetchMovies, fetchTrailerKey, fetchWatchProviders, fetchTrendingAll, SORT_MODES } from '../tmdb.js';
 import { asyncHandler } from '../asyncHandler.js';
 
 const router = Router();
@@ -19,21 +19,23 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 }));
 
-// Powers the Reels tab — TMDB's global trending list, independent of the
-// caller's genre/language/region filters or swipe history (Reels is
-// watch-only browsing, not a swipeable deck).
+// Powers the Browse tab — TMDB's global trending list (movies and TV shows),
+// independent of the caller's genre/language/region filters or swipe history
+// (Browse is watch-only browsing, not a swipeable deck).
 router.get('/trending', asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   try {
-    const { movies, totalPages } = await fetchTrendingMovies({ page });
+    const { movies, totalPages } = await fetchTrendingAll({ page });
     res.json({ movies, page, totalPages });
   } catch (err) {
-    res.status(502).json({ error: 'Failed to fetch trending movies', detail: err.message });
+    res.status(502).json({ error: 'Failed to fetch trending', detail: err.message });
   }
 }));
 
 router.get('/:id/trailer', asyncHandler(async (req, res) => {
-  const key = await fetchTrailerKey(req.params.id).catch(() => null);
+  const mediaType = req.query.type === 'tv' ? 'tv' : 'movie';
+  const title = req.query.title ? String(req.query.title) : undefined;
+  const key = await fetchTrailerKey(req.params.id, { mediaType, title }).catch(() => null);
   res.json({ key });
 }));
 
