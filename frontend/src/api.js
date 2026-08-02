@@ -89,3 +89,20 @@ export async function getMySuperlikes() {
 export function deleteMySuperlike(movieId) {
   return request(`/me/superlikes/${movieId}`, { method: 'DELETE' });
 }
+export function shareWithFriend(friendId, movie) {
+  return request(`/friends/${friendId}/share`, {
+    method: 'POST',
+    body: {
+      movieId: movie.id,
+      mediaType: movie.mediaType,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
+      rating: movie.rating,
+      genres: movie.genres,
+    },
+  });
+}
+export async function getFriendShares(friendId) {
+  const { movies } = await request(`/friends/${friendId}/shares`);
+  return movies;
+}

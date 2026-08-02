@@ -142,4 +142,41 @@ router.delete('/:id/matches/:movieId', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Shares a movie/show (from Browse) with a friend. Gated on an existing
+// (non-pending) friendship, same as superlikes. Fields are passed straight
+// through from the caller rather than looked up in `movies`, since Browse
+// items — especially TV shows — aren't reliably cached there.
+router.post('/:id/share', asyncHandler(async (req, res) => {
+  const friendId = Number(req.params.id);
+  const { movieId, mediaType = 'movie', title, posterUrl, rating, genres = [] } = req.body || {};
+  if (!movieId || !title) return res.status(400).json({ error: 'movieId and title are required' });
+
+  const { rows: connected } = await pool.query(
+    `SELECT 1 FROM friendships WHERE user_id = $1 AND friend_id = $2 AND status IN ('connected', 'partner')`,
+    [req.userId, friendId],
+  );
+  if (!connected.length) return res.status(403).json({ error: 'Not connected with that user' });
+
+  await pool.query(
+    `INSERT INTO shares (from_user_id, to_user_id, movie_id, media_type, title, poster_url, rating, genres)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [req.userId, friendId, String(movieId), mediaType === 'tv' ? 'tv' : 'movie', title, posterUrl || null, rating ?? null, JSON.stringify(genres)],
+  );
+  res.json({ ok: true });
+}));
+
+// What a friend has shared with the caller, newest first — shown as a
+// "Shared with you" rail on the Matches screen alongside their superlikes.
+router.get('/:id/shares', asyncHandler(async (req, res) => {
+  const friendId = Number(req.params.id);
+  const { rows: movies } = await pool.query(
+    `SELECT id AS "shareId", movie_id AS id, media_type AS "mediaType", title, poster_url AS "posterUrl",
+            rating, genres, created_at AS "sharedAt"
+     FROM shares WHERE from_user_id = $1 AND to_user_id = $2
+     ORDER BY created_at DESC`,
+    [friendId, req.userId],
+  );
+  res.json({ movies });
+}));
+
 export default router;

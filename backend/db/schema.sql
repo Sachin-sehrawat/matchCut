@@ -82,3 +82,20 @@ CREATE TABLE IF NOT EXISTS hidden_superlikes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, movie_id)
 );
+
+-- A movie/show a user shared with a friend from the Browse tab. Fields are
+-- denormalized (not a FK to `movies`) because Browse also surfaces TV items,
+-- which are never cached in `movies` (TMDB movie/tv ids are separate
+-- namespaces that can collide — see fetchTrendingAll in tmdb.js).
+CREATE TABLE IF NOT EXISTS shares (
+  id SERIAL PRIMARY KEY,
+  from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL,
+  media_type TEXT NOT NULL DEFAULT 'movie' CHECK (media_type IN ('movie', 'tv')),
+  title TEXT NOT NULL,
+  poster_url TEXT,
+  rating NUMERIC,
+  genres JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

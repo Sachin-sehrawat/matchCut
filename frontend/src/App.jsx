@@ -95,6 +95,8 @@ export default function App() {
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [friendSuperlikes, setFriendSuperlikes] = useState([]);
   const [friendSuperlikesLoading, setFriendSuperlikesLoading] = useState(false);
+  const [friendShares, setFriendShares] = useState([]);
+  const [friendSharesLoading, setFriendSharesLoading] = useState(false);
   const [mySuperlikes, setMySuperlikes] = useState([]);
   const [mySuperlikesLoading, setMySuperlikesLoading] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
@@ -181,6 +183,19 @@ export default function App() {
       .then((movies) => { if (!cancelled) setFriendSuperlikes(movies); })
       .catch(() => { if (!cancelled) setFriendSuperlikes([]); })
       .finally(() => { if (!cancelled) setFriendSuperlikesLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeFriendId]);
+
+  // — what this friend has shared with the user (Matches tab) —
+  useEffect(() => {
+    setFriendShares([]);
+    if (!activeFriendId) return;
+    setFriendSharesLoading(true);
+    let cancelled = false;
+    api.getFriendShares(activeFriendId)
+      .then((movies) => { if (!cancelled) setFriendShares(movies); })
+      .catch(() => { if (!cancelled) setFriendShares([]); })
+      .finally(() => { if (!cancelled) setFriendSharesLoading(false); });
     return () => { cancelled = true; };
   }, [activeFriendId]);
 
@@ -484,7 +499,7 @@ export default function App() {
     setMovieDetail(movie);
     setMovieDetailProviders(null);
     setMovieDetailProvidersLoading(true);
-    api.getWatchProviders(movie.id, regionsSel)
+    api.getWatchProviders(movie.id, regionsSel, { mediaType: movie.mediaType })
       .then(setMovieDetailProviders)
       .catch(() => setMovieDetailProviders({ region: null }))
       .finally(() => setMovieDetailProvidersLoading(false));
@@ -577,7 +592,7 @@ export default function App() {
                   sortMode={sortMode} changeSortMode={changeSortMode}
                 />
               )}
-              {tab === 'browse' && <BrowseScreen />}
+              {tab === 'browse' && <BrowseScreen friends={friends} />}
               {tab === 'matches' && (
                 <MatchesScreen
                   friendChips={chipFriends}
@@ -586,6 +601,7 @@ export default function App() {
                   onSelectMovie={openMovieDetail}
                   onDeleteMatch={deleteMatch}
                   friendSuperlikes={friendSuperlikes} friendSuperlikesLoading={friendSuperlikesLoading}
+                  friendShares={friendShares} friendSharesLoading={friendSharesLoading}
                 />
               )}
               {tab === 'friends' && (
@@ -986,7 +1002,7 @@ function ProviderRow({ label, items, movieTitle }) {
 // TikTok-style vertical trailer feed (the "Browse" tab). Self-contained
 // (fetches its own trending list + trailers) since it doesn't interact with
 // the swipe deck/matching state at all — Browse is watch-only browsing.
-function BrowseScreen() {
+function BrowseScreen({ friends }) {
   const [movies, setMovies] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1092,6 +1108,7 @@ function BrowseScreen() {
           toggleMuted={() => setMuted((v) => !v)}
           liked={likedIds.has(movie.id)}
           onToggleLike={() => toggleLike(movie.id)}
+          friends={friends}
           registerRef={(el) => {
             if (el) { el.dataset.index = i; itemRefs.current.set(movie.id, el); }
             else itemRefs.current.delete(movie.id);
@@ -1127,11 +1144,31 @@ function useCoverSize(ref, ratio = 16 / 9) {
   return box;
 }
 
-function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, liked, onToggleLike, registerRef }) {
+function HeartIcon({ liked, size = 30 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={liked ? '#ff3b5c' : 'none'} stroke={liked ? '#ff3b5c' : '#fff'} strokeWidth="2">
+      <path d="M12 21s-7.5-4.6-10-9.2C.5 8.7 2 5 5.5 5c2 0 3.5 1.2 4.8 3.1C11.6 6.2 13 5 15 5c3.5 0 5 3.7 3.5 6.8C19.5 16.4 12 21 12 21z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShareIcon({ size = 26 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+      <circle cx="18" cy="5" r="2.7" />
+      <circle cx="6" cy="12" r="2.7" />
+      <circle cx="18" cy="19" r="2.7" />
+      <path d="M8.5 10.7l7-4.2M8.5 13.3l7 4.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, liked, onToggleLike, friends, registerRef }) {
   const boxRef = useRef(null);
   const { width, height } = useCoverSize(boxRef);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
-  const [shareToast, setShareToast] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareToast, setShareToast] = useState(null);
   const tapTimer = useRef(null);
 
   const burstLike = () => {
@@ -1156,17 +1193,36 @@ function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, 
     }
   };
 
-  const handleShare = async (e) => {
+  const openShareSheet = (e) => {
     e.stopPropagation();
+    setShareSheetOpen(true);
+  };
+
+  const shareExternally = async () => {
     const url = `https://www.themoviedb.org/${movie.mediaType === 'tv' ? 'tv' : 'movie'}/${movie.id}`;
     const shareData = { title: movie.title, text: `Check out ${movie.title} on MatchCut`, url };
     if (navigator.share) {
-      navigator.share(shareData).catch(() => {});
+      await navigator.share(shareData).catch(() => {});
+      setShareSheetOpen(false);
     } else if (navigator.clipboard) {
       await navigator.clipboard.writeText(url).catch(() => {});
-      setShareToast(true);
-      setTimeout(() => setShareToast(false), 1600);
+      setShareSheetOpen(false);
+      setShareToast('Link copied');
+      setTimeout(() => setShareToast(null), 1600);
     }
+  };
+
+  const shareToFriend = (friend) => {
+    setShareSheetOpen(false);
+    api.shareWithFriend(friend.id, movie)
+      .then(() => {
+        setShareToast(`Shared with ${friend.username}`);
+        setTimeout(() => setShareToast(null), 1600);
+      })
+      .catch(() => {
+        setShareToast('Could not share');
+        setTimeout(() => setShareToast(null), 1600);
+      });
   };
 
   const providerItems = providers ? [...(providers.flatrate || []), ...(providers.rent || []), ...(providers.buy || [])].slice(0, 4) : [];
@@ -1227,11 +1283,11 @@ function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, 
       {/* Instagram-style right-side action rail: like + share, with
           streaming-service shortcuts underneath. */}
       <div style={{ position: 'absolute', right: 12, bottom: 190, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 6 }}>
-        <button onClick={(e) => { e.stopPropagation(); onToggleLike(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 30 }}>{liked ? '❤️' : '🤍'}</span>
+        <button aria-label="Like" onClick={(e) => { e.stopPropagation(); onToggleLike(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <HeartIcon liked={liked} />
         </button>
-        <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-          <span style={{ fontSize: 26 }}>↗️</span>
+        <button aria-label="Share" onClick={openShareSheet} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <ShareIcon />
         </button>
         {providerItems.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
@@ -1257,15 +1313,72 @@ function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, 
       </div>
 
       {shareToast && (
-        <div style={{ position: 'absolute', left: '50%', bottom: 190, transform: 'translateX(-50%)', background: 'rgba(0,0,0,.75)', color: '#fff', padding: '8px 14px', borderRadius: 20, font: '600 11.5px var(--font-body)' }}>
-          Link copied
+        <div style={{ position: 'absolute', left: '50%', bottom: 190, transform: 'translateX(-50%)', background: 'rgba(0,0,0,.75)', color: '#fff', padding: '8px 14px', borderRadius: 20, font: '600 11.5px var(--font-body)', whiteSpace: 'nowrap', zIndex: 8 }}>
+          {shareToast}
         </div>
+      )}
+
+      {shareSheetOpen && (
+        <ShareSheet
+          friends={friends}
+          onShareToFriend={shareToFriend}
+          onShareExternally={shareExternally}
+          onClose={() => setShareSheetOpen(false)}
+        />
       )}
     </div>
   );
 }
 
-function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch, friendSuperlikes, friendSuperlikesLoading }) {
+function ShareSheet({ friends, onShareToFriend, onShareExternally, onClose }) {
+  const shareable = (friends || []).filter((f) => f.status !== 'pending');
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end' }} onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: '100%', maxHeight: '70%', overflow: 'auto', background: 'var(--color-bg)', borderRadius: '20px 20px 0 0', boxSizing: 'border-box', padding: '18px 20px 26px' }}
+      >
+        <div style={{ width: 40, height: 4, background: 'var(--color-divider)', margin: '0 auto 16px', borderRadius: 4 }} />
+        <div style={{ font: '800 15px var(--font-heading)', color: 'var(--color-text)', marginBottom: 14 }}>Share</div>
+
+        <button
+          onClick={onShareExternally}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', marginBottom: 6 }}
+        >
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-neutral-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+            <ShareIcon size={20} />
+          </div>
+          <span style={{ font: '600 14px var(--font-body)', color: 'var(--color-text)' }}>Share externally</span>
+        </button>
+
+        {shareable.length > 0 ? (
+          <>
+            <div style={{ font: '700 11px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', margin: '10px 0 6px' }}>Friends &amp; partner</div>
+            {shareable.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => onShareToFriend(f)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', flex: 'none' }}>
+                  <Avatar id={f.id} size={40} radius={9999} />
+                </div>
+                <span style={{ font: '600 14px var(--font-body)', color: 'var(--color-text)' }}>{f.username}</span>
+                {f.status === 'partner' && <span className="tag tag-accent" style={{ font: '700 9px var(--font-body)' }}>Partner</span>}
+              </button>
+            ))}
+          </>
+        ) : (
+          <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', margin: '10px 0' }}>No friends yet — invite someone from the Friends tab first.</div>
+        )}
+
+        <button className="btn btn-ghost btn-block" onClick={onClose} style={{ marginTop: 18 }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch, friendSuperlikes, friendSuperlikesLoading, friendShares, friendSharesLoading }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
@@ -1299,6 +1412,24 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
             </div>
           ) : (
             <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 18 }}>No super likes yet.</div>
+          )}
+
+          <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 8 }}>Shared with you</div>
+          {friendSharesLoading ? (
+            <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 16 }}>Loading…</div>
+          ) : friendShares.length > 0 ? (
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginBottom: 18 }}>
+              {friendShares.map((m) => (
+                <button key={m.shareId} onClick={() => onSelectMovie(m)} style={{ flex: 'none', width: 84, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                  <div style={{ width: 84, height: 120, background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative', marginBottom: 6 }}>
+                    <Poster id={m.id} src={m.posterUrl} radius={12} />
+                  </div>
+                  <span style={{ display: 'block', font: '700 11.5px/1.3 var(--font-body)', color: 'var(--color-text)' }}>{m.title}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 18 }}>Nothing shared with you yet.</div>
           )}
 
           <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 4 }}>You &amp; {activeFriend.username}</div>
