@@ -69,3 +69,7 @@ export function promotePartner(friendId) {
 export function deleteMatch(friendId, movieId) {
   return request(`/friends/${friendId}/matches/${movieId}`, { method: 'DELETE' });
 }
+export async function getFriendSuperlikes(friendId) {
+  const { movies } = await request(`/friends/${friendId}/superlikes`);
+  return movies;
+}

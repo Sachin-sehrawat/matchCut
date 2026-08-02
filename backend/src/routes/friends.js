@@ -17,7 +17,8 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const friends = await Promise.all(friendships.map(async (f) => {
     const { rows: common } = await pool.query(
-      `SELECT m.tmdb_id AS id, m.title, m.overview AS desc, m.rating, m.genres, m.poster_url AS "posterUrl"
+      `SELECT m.tmdb_id AS id, m.title, m.overview AS desc, m.rating, m.genres, m.poster_url AS "posterUrl",
+              CASE WHEN s1.created_at > s2.created_at THEN s1.created_at ELSE s2.created_at END AS "matchedAt"
        FROM swipes s1
        JOIN swipes s2 ON s2.movie_id = s1.movie_id
        JOIN movies m ON m.tmdb_id = s1.movie_id
@@ -26,7 +27,8 @@ router.get('/', asyncHandler(async (req, res) => {
          AND NOT EXISTS (
            SELECT 1 FROM dismissed_matches d
            WHERE d.user_id = $1 AND d.friend_id = $2 AND d.movie_id = s1.movie_id
-         )`,
+         )
+       ORDER BY "matchedAt" DESC`,
       [req.userId, f.id],
     );
     return { ...f, common };
@@ -101,6 +103,30 @@ router.post('/:id/partner', asyncHandler(async (req, res) => {
   );
 
   res.json({ ok: true });
+}));
+
+// The friend's own super-liked movies, newest first — used to show "what
+// they super-liked" on the Matches screen. Gated on an existing (non-
+// pending) friendship so a random user id can't be probed for someone's
+// taste.
+router.get('/:id/superlikes', asyncHandler(async (req, res) => {
+  const friendId = Number(req.params.id);
+  const { rows: connected } = await pool.query(
+    `SELECT 1 FROM friendships WHERE user_id = $1 AND friend_id = $2 AND status IN ('connected', 'partner')`,
+    [req.userId, friendId],
+  );
+  if (!connected.length) return res.status(403).json({ error: 'Not connected with that user' });
+
+  const { rows: movies } = await pool.query(
+    `SELECT m.tmdb_id AS id, m.title, m.overview AS desc, m.rating, m.genres, m.poster_url AS "posterUrl",
+            s.created_at AS "superlikedAt"
+     FROM swipes s
+     JOIN movies m ON m.tmdb_id = s.movie_id
+     WHERE s.user_id = $1 AND s.direction = 'superlike'
+     ORDER BY s.created_at DESC`,
+    [friendId],
+  );
+  res.json({ movies });
 }));
 
 // Hides a shared like from the caller's own Matches list with this friend.

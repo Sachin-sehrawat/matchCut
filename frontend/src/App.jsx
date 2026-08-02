@@ -93,6 +93,8 @@ export default function App() {
   const [movieDetailProvidersLoading, setMovieDetailProvidersLoading] = useState(false);
 
   const [activeFriendId, setActiveFriendId] = useState(null);
+  const [friendSuperlikes, setFriendSuperlikes] = useState([]);
+  const [friendSuperlikesLoading, setFriendSuperlikesLoading] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [sentInvites, setSentInvites] = useState([]);
   const [inviteError, setInviteError] = useState(null);
@@ -166,6 +168,19 @@ export default function App() {
       .finally(() => { if (!cancelled) setProvidersLoading(false); });
     return () => { cancelled = true; };
   }, [deckIndex, movies, regionsSel]);
+
+  // — friend's super likes (Matches tab) —
+  useEffect(() => {
+    setFriendSuperlikes([]);
+    if (!activeFriendId) return;
+    setFriendSuperlikesLoading(true);
+    let cancelled = false;
+    api.getFriendSuperlikes(activeFriendId)
+      .then((movies) => { if (!cancelled) setFriendSuperlikes(movies); })
+      .catch(() => { if (!cancelled) setFriendSuperlikes([]); })
+      .finally(() => { if (!cancelled) setFriendSuperlikesLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeFriendId]);
 
   // — drag binding —
   useEffect(() => {
@@ -546,6 +561,7 @@ export default function App() {
                   activeFriend={activeFriend} commonMovies={commonMovies}
                   onSelectMovie={openMovieDetail}
                   onDeleteMatch={deleteMatch}
+                  friendSuperlikes={friendSuperlikes} friendSuperlikesLoading={friendSuperlikesLoading}
                 />
               )}
               {tab === 'friends' && (
@@ -941,7 +957,7 @@ function ProviderRow({ label, items, movieTitle }) {
   );
 }
 
-function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch }) {
+function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch, friendSuperlikes, friendSuperlikesLoading }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '18px 18px 12px', boxSizing: 'border-box', overflow: 'auto' }}>
@@ -959,6 +975,24 @@ function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeF
 
       {activeFriend && (
         <>
+          <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 8 }}>{activeFriend.username}'s Super Likes</div>
+          {friendSuperlikesLoading ? (
+            <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 16 }}>Loading…</div>
+          ) : friendSuperlikes.length > 0 ? (
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginBottom: 18 }}>
+              {friendSuperlikes.map((m) => (
+                <button key={m.id} onClick={() => onSelectMovie(m)} style={{ flex: 'none', width: 84, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                  <div style={{ width: 84, height: 120, background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative', marginBottom: 6 }}>
+                    <Poster id={m.id} src={m.posterUrl} radius={12} />
+                  </div>
+                  <span style={{ display: 'block', font: '700 11.5px/1.3 var(--font-body)', color: 'var(--color-text)' }}>{m.title}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 18 }}>No super likes yet.</div>
+          )}
+
           <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 4 }}>You &amp; {activeFriend.username}</div>
           <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 16 }}>{commonCountText}</div>
         </>
