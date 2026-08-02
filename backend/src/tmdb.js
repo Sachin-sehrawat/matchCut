@@ -197,12 +197,14 @@ export async function fetchMovies({ genres = [], language, regions = [], userId,
   return movies;
 }
 
-// Independent of any user's onboarding genres/language/region or swipe
-// history — this is TMDB's own global "trending this week" ranking (movies
-// and TV shows both), used to power the Browse tab's trailer feed. Unlike
-// fetchMovies, nothing here is filtered or biased per-user since Browse is
-// watch-only (no swipe actions).
-export async function fetchTrendingAll({ page = 1 } = {}) {
+// Independent of any user's onboarding genres/language/region filters — this
+// is TMDB's own global "trending this week" ranking (movies and TV shows
+// both), used to power the Browse tab's trailer feed. The order is biased
+// (not filtered) by the caller's per-genre preference scores the same way
+// Discover's "For You" deck is (see weightedShuffle/getGenreScores below) —
+// nothing is excluded, Browse still surfaces the same trending catalog for
+// everyone, liked genres just tend to surface nearer the top.
+export async function fetchTrendingAll({ page = 1, userId } = {}) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) throw new Error('Missing TMDB_API_KEY');
 
@@ -232,7 +234,10 @@ export async function fetchTrendingAll({ page = 1 } = {}) {
   // matching/swipes) — caching TV items there risks id collisions, since
   // TMDB movie ids and tv ids are separate namespaces that can overlap.
   await upsertMovies(items.filter((m) => m.mediaType === 'movie'));
-  return { movies: items, totalPages: json.total_pages || 1 };
+
+  const genreScores = userId ? await getGenreScores(userId) : {};
+  const ranked = weightedShuffle(items, genreScores);
+  return { movies: ranked, totalPages: json.total_pages || 1 };
 }
 
 function mapProvider(p) {

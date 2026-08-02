@@ -25,7 +25,7 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/trending', asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   try {
-    const { movies, totalPages } = await fetchTrendingAll({ page });
+    const { movies, totalPages } = await fetchTrendingAll({ page, userId: req.userId });
     res.json({ movies, page, totalPages });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch trending', detail: err.message });
