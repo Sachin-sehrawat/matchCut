@@ -658,7 +658,7 @@ function LoginScreen({ authMode, setAuthMode, authForm, setAuthForm, authError, 
   return (
     <div style={{ position: 'absolute', inset: 0, padding: '120px 28px 40px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1 }}>
-        <div style={{ font: '800 15px/1 var(--font-heading)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--color-accent-700)' }}>MatchCut</div>
+        <div style={{ font: '800 15px/1 var(--font-heading)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--color-accent-700)' }}>Swooshly</div>
         <h1 style={{ margin: '18px 0 0', font: '800 40px/1.05 var(--font-heading)', color: 'var(--color-text)' }}>Swipe movies.<br />Match with your person.</h1>
         <p style={{ margin: '16px 0 0', font: '400 15px/1.5 var(--font-body)', color: 'var(--color-neutral-700)' }}>Swipe through new releases together. When you both like the same title, we'll tell you.</p>
       </div>
@@ -1200,7 +1200,7 @@ function BrowseItem({ movie, active, trailerKey, providers, muted, toggleMuted, 
 
   const shareExternally = async () => {
     const url = `https://www.themoviedb.org/${movie.mediaType === 'tv' ? 'tv' : 'movie'}/${movie.id}`;
-    const shareData = { title: movie.title, text: `Check out ${movie.title} on MatchCut`, url };
+    const shareData = { title: movie.title, text: `Check out ${movie.title} on Swooshly`, url };
     if (navigator.share) {
       await navigator.share(shareData).catch(() => {});
       setShareSheetOpen(false);
@@ -1493,7 +1493,7 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
         )}
         {pickedContacts.length === 0 && !contactsError && (
           <div style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--color-neutral-700)' }}>
-            {contactsSupported ? "Pick contacts from your device to see who's already on MatchCut." : 'Not supported on this browser/device (works in Chrome/Edge on Android) — add someone by username above instead.'}
+            {contactsSupported ? "Pick contacts from your device to see who's already on Swooshly." : 'Not supported on this browser/device (works in Chrome/Edge on Android) — add someone by username above instead.'}
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

@@ -1,6 +1,6 @@
 # context.md
 
-Living snapshot of the MatchCut ("Reel Two") app's current state. Update this file whenever a feature, screen, or piece of state is added, changed, or removed — this should always reflect what's actually in the code, not the original design spec.
+Living snapshot of the Swooshly (formerly "MatchCut", originally "Reel Two") app's current state. Update this file whenever a feature, screen, or piece of state is added, changed, or removed — this should always reflect what's actually in the code, not the original design spec.
 
 _Last updated: 2026-08-01_
 

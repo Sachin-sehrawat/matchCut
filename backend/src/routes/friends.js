@@ -47,7 +47,7 @@ router.post('/invite', asyncHandler(async (req, res) => {
 
   const { rows } = await pool.query('SELECT id FROM users WHERE username = $1 OR email = $1', [lookup]);
   const friend = rows[0];
-  if (!friend) return res.status(404).json({ error: 'No MatchCut user with that username or email' });
+  if (!friend) return res.status(404).json({ error: 'No Swooshly user with that username or email' });
   if (friend.id === req.userId) return res.status(400).json({ error: "Can't invite yourself" });
 
   const status = asPartner ? 'partner' : 'pending';
