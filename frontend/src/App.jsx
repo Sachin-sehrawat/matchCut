@@ -6,7 +6,7 @@ import * as api from './api.js';
 
 const SUPERLIKE_LIMIT = 5;
 const TRAILER_DELAY_MS = 3000;
-const MATCH_CELEBRATION = 'full-screen'; // 'full-screen' | 'toast'
+const MATCH_CELEBRATION = 'toast'; // 'full-screen' | 'toast'
 const DIRECTION_MAP = { right: 'like', left: 'maybe', up: 'superlike', down: 'discard' };
 
 // Synthesized (no audio assets needed) — one short distinct tone per swipe
@@ -581,7 +581,7 @@ export default function App() {
           <MatchModalFull movie={showMatch} partnerName={partnerFriend?.username} viewInMatches={viewInMatches} dismissMatch={dismissMatch} />
         )}
         {showMatch && MATCH_CELEBRATION === 'toast' && (
-          <MatchModalToast movie={showMatch} partnerName={partnerFriend?.username} viewInMatches={viewInMatches} />
+          <MatchModalToast movie={showMatch} partnerName={partnerFriend?.username} viewInMatches={viewInMatches} dismissMatch={dismissMatch} />
         )}
         {showPaywall && (
           <PaywallModal superlikeLimit={SUPERLIKE_LIMIT} closePaywall={closePaywall} />
@@ -1186,7 +1186,11 @@ function MatchModalFull({ movie, partnerName, viewInMatches, dismissMatch }) {
   );
 }
 
-function MatchModalToast({ movie, partnerName, viewInMatches }) {
+function MatchModalToast({ movie, partnerName, viewInMatches, dismissMatch }) {
+  useEffect(() => {
+    const t = setTimeout(dismissMatch, 4000);
+    return () => clearTimeout(t);
+  }, [movie, dismissMatch]);
   return (
     <div style={{ position: 'absolute', left: 14, right: 14, bottom: 104, zIndex: 100, background: 'var(--color-text)', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, animation: 'toastIn .35s ease-out', boxShadow: 'var(--shadow-lg)', borderRadius: 16 }}>
       <div style={{ width: 12, height: 12, background: 'var(--color-accent)', flex: 'none', borderRadius: '50%' }} />
