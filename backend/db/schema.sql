@@ -71,3 +71,14 @@ CREATE TABLE IF NOT EXISTS dismissed_matches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, friend_id, movie_id)
 );
+
+-- A user removing a movie from their own "Your Super Likes" list on the
+-- Profile screen. Hides it only from that list — doesn't touch the
+-- underlying swipe, so it has no effect on genre_preferences, the
+-- once-swiped deck exclusion, or shared Matches with friends.
+CREATE TABLE IF NOT EXISTS hidden_superlikes (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL REFERENCES movies(tmdb_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, movie_id)
+);

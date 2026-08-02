@@ -55,3 +55,10 @@ CREATE TABLE IF NOT EXISTS dismissed_matches (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (user_id, friend_id, movie_id)
 );
+
+CREATE TABLE IF NOT EXISTS hidden_superlikes (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL REFERENCES movies(tmdb_id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, movie_id)
+);

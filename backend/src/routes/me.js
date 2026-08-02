@@ -21,10 +21,26 @@ router.get('/superlikes', asyncHandler(async (req, res) => {
      FROM swipes s
      JOIN movies m ON m.tmdb_id = s.movie_id
      WHERE s.user_id = $1 AND s.direction = 'superlike'
+       AND NOT EXISTS (
+         SELECT 1 FROM hidden_superlikes h WHERE h.user_id = $1 AND h.movie_id = s.movie_id
+       )
      ORDER BY s.created_at DESC`,
     [req.userId],
   );
   res.json({ movies });
+}));
+
+// Removes a movie from the caller's own "Your Super Likes" list. Only hides
+// it there — the underlying swipe is untouched, so genre_preferences, the
+// once-swiped deck exclusion, and any shared Matches with friends are
+// unaffected.
+router.delete('/superlikes/:movieId', asyncHandler(async (req, res) => {
+  await pool.query(
+    `INSERT INTO hidden_superlikes (user_id, movie_id) VALUES ($1, $2)
+     ON CONFLICT (user_id, movie_id) DO NOTHING`,
+    [req.userId, req.params.movieId],
+  );
+  res.json({ ok: true });
 }));
 
 router.patch('/preferences', asyncHandler(async (req, res) => {

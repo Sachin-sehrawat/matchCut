@@ -77,3 +77,6 @@ export async function getMySuperlikes() {
   const { movies } = await request('/me/superlikes');
   return movies;
 }
+export function deleteMySuperlike(movieId) {
+  return request(`/me/superlikes/${movieId}`, { method: 'DELETE' });
+}

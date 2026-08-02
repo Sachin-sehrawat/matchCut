@@ -471,6 +471,15 @@ export default function App() {
     }
   };
 
+  const deleteMySuperlike = async (movieId) => {
+    setMySuperlikes((list) => list.filter((m) => m.id !== movieId));
+    try {
+      await api.deleteMySuperlike(movieId);
+    } catch {
+      api.getMySuperlikes().then(setMySuperlikes).catch(() => {});
+    }
+  };
+
   const openMovieDetail = (movie) => {
     setMovieDetail(movie);
     setMovieDetailProviders(null);
@@ -598,7 +607,7 @@ export default function App() {
                   openPaywall={openPaywall} prefsSummary={prefsSummary}
                   goToOnboarding={goToOnboarding} goToLogin={goToLogin}
                   mySuperlikes={mySuperlikes} mySuperlikesLoading={mySuperlikesLoading}
-                  onSelectMovie={openMovieDetail}
+                  onSelectMovie={openMovieDetail} onDeleteSuperlike={deleteMySuperlike}
                 />
               )}
             </div>
@@ -1144,7 +1153,7 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
   );
 }
 
-function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, prefsSummary, goToOnboarding, goToLogin, mySuperlikes, mySuperlikesLoading, onSelectMovie }) {
+function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, prefsSummary, goToOnboarding, goToLogin, mySuperlikes, mySuperlikesLoading, onSelectMovie, onDeleteSuperlike }) {
   const isFounder = user?.role === 'founder';
   const pct = Math.round((superlikesLeft / superlikeLimit) * 100);
   return (
@@ -1184,12 +1193,19 @@ function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, pref
       ) : mySuperlikes.length > 0 ? (
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginBottom: 22 }}>
           {mySuperlikes.map((m) => (
-            <button key={m.id} onClick={() => onSelectMovie(m)} style={{ flex: 'none', width: 84, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <div key={m.id} style={{ flex: 'none', width: 84 }}>
               <div style={{ width: 84, height: 120, background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative', marginBottom: 6 }}>
-                <Poster id={m.id} src={m.posterUrl} radius={12} />
+                <button onClick={() => onSelectMovie(m)} style={{ position: 'absolute', inset: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: '100%', height: '100%' }}>
+                  <Poster id={m.id} src={m.posterUrl} radius={12} />
+                </button>
+                <button
+                  onClick={() => onDeleteSuperlike(m.id)}
+                  aria-label="Remove super like"
+                  style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,.6)', color: '#fff', font: '700 12px var(--font-body)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
               </div>
               <span style={{ display: 'block', font: '700 11.5px/1.3 var(--font-body)', color: 'var(--color-text)' }}>{m.title}</span>
-            </button>
+            </div>
           ))}
         </div>
       ) : (
