@@ -811,9 +811,9 @@ function WatchProviders({ providersLoading, providers, movieTitle }) {
   const hasAny = providers.flatrate?.length || providers.rent?.length || providers.buy?.length;
   return (
     <div style={{ marginTop: 8 }}>
-      <ProviderRow label="Stream" items={providers.flatrate} />
-      <ProviderRow label="Rent" items={providers.rent} />
-      <ProviderRow label="Buy" items={providers.buy} />
+      <ProviderRow label="Stream" items={providers.flatrate} movieTitle={movieTitle} />
+      <ProviderRow label="Rent" items={providers.rent} movieTitle={movieTitle} />
+      <ProviderRow label="Buy" items={providers.buy} movieTitle={movieTitle} />
       {!hasAny && providers.link && (
         <a href={providers.link} target="_blank" rel="noreferrer" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} style={{ font: '600 11px var(--font-body)', color: 'var(--color-accent)' }}>
           See where to watch →
@@ -826,18 +826,58 @@ function WatchProviders({ providersLoading, providers, movieTitle }) {
   );
 }
 
-function ProviderRow({ label, items }) {
+// TMDB's provider_name strings vary by region ("Amazon Prime Video" vs
+// "Prime Video", "HBO Max" vs "Max", etc.), so these match loosely and fall
+// through to a Google search (which still lands on the right app via
+// universal links on most phones) for anything unrecognized.
+const PROVIDER_URL_BUILDERS = [
+  { match: /netflix/i, url: (t) => `https://www.netflix.com/search?q=${encodeURIComponent(t)}` },
+  { match: /prime video/i, url: (t) => `https://www.primevideo.com/search?phrase=${encodeURIComponent(t)}` },
+  { match: /disney/i, url: (t) => `https://www.disneyplus.com/search?q=${encodeURIComponent(t)}` },
+  { match: /hulu/i, url: (t) => `https://www.hulu.com/search?q=${encodeURIComponent(t)}` },
+  { match: /apple tv/i, url: (t) => `https://tv.apple.com/search?term=${encodeURIComponent(t)}` },
+  { match: /\bmax\b|hbo/i, url: (t) => `https://play.max.com/search?q=${encodeURIComponent(t)}` },
+  { match: /paramount/i, url: (t) => `https://www.paramountplus.com/search/?query=${encodeURIComponent(t)}` },
+  { match: /peacock/i, url: (t) => `https://www.peacocktv.com/search?q=${encodeURIComponent(t)}` },
+  { match: /youtube/i, url: (t) => `https://www.youtube.com/results?search_query=${encodeURIComponent(`${t} movie`)}` },
+  { match: /google play|google tv/i, url: (t) => `https://play.google.com/store/search?q=${encodeURIComponent(t)}&c=movies` },
+  { match: /hotstar/i, url: (t) => `https://www.hotstar.com/in/search?q=${encodeURIComponent(t)}` },
+  { match: /jiocinema/i, url: (t) => `https://www.jiocinema.com/search/${encodeURIComponent(t)}` },
+  { match: /zee5/i, url: (t) => `https://www.zee5.com/search?q=${encodeURIComponent(t)}` },
+  { match: /sonyliv/i, url: (t) => `https://www.sonyliv.com/search?q=${encodeURIComponent(t)}` },
+  { match: /mubi/i, url: (t) => `https://mubi.com/search/films?query=${encodeURIComponent(t)}` },
+  { match: /crunchyroll/i, url: (t) => `https://www.crunchyroll.com/search?q=${encodeURIComponent(t)}` },
+];
+
+function providerLinkFor(name, title) {
+  const builder = PROVIDER_URL_BUILDERS.find((b) => b.match.test(name));
+  if (builder) return builder.url(title);
+  return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} on ${name}`)}`;
+}
+
+function ProviderRow({ label, items, movieTitle }) {
   if (!items || !items.length) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
       <span style={{ font: '700 9px var(--font-body)', color: 'rgba(255,255,255,.7)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', minWidth: 42, flex: 'none' }}>{label}</span>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {items.slice(0, 6).map((p) => (
-          p.logoPath ? (
-            <img key={p.id} src={p.logoPath} alt={p.name} title={p.name} style={{ width: 22, height: 22, borderRadius: 6, objectFit: 'cover', flex: 'none' }} />
-          ) : (
-            <span key={p.id} title={p.name} style={{ font: '600 9px var(--font-body)', color: '#fff', background: 'rgba(255,255,255,.15)', padding: '4px 6px', borderRadius: 6, flex: 'none' }}>{p.name}</span>
-          )
+          <a
+            key={p.id}
+            href={providerLinkFor(p.name, movieTitle)}
+            target="_blank"
+            rel="noreferrer"
+            title={p.name}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={{ flex: 'none', display: 'block' }}
+          >
+            {p.logoPath ? (
+              <img src={p.logoPath} alt={p.name} style={{ width: 22, height: 22, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <span style={{ font: '600 9px var(--font-body)', color: '#fff', background: 'rgba(255,255,255,.15)', padding: '4px 6px', borderRadius: 6, display: 'block' }}>{p.name}</span>
+            )}
+          </a>
         ))}
       </div>
     </div>
@@ -1134,9 +1174,9 @@ function MovieDetailModal({ movie, providers, providersLoading, onClose }) {
           </div>
         ) : (
           <div>
-            <DetailProviderRow label="Stream" items={providers.flatrate} />
-            <DetailProviderRow label="Rent" items={providers.rent} />
-            <DetailProviderRow label="Buy" items={providers.buy} />
+            <DetailProviderRow label="Stream" items={providers.flatrate} movieTitle={movie.title} />
+            <DetailProviderRow label="Rent" items={providers.rent} movieTitle={movie.title} />
+            <DetailProviderRow label="Buy" items={providers.buy} movieTitle={movie.title} />
             {!(providers.flatrate?.length || providers.rent?.length || providers.buy?.length) && providers.link && (
               <a href={providers.link} target="_blank" rel="noreferrer" style={{ font: '600 12px var(--font-body)', color: 'var(--color-accent-700)' }}>See where to watch →</a>
             )}
@@ -1148,18 +1188,20 @@ function MovieDetailModal({ movie, providers, providersLoading, onClose }) {
   );
 }
 
-function DetailProviderRow({ label, items }) {
+function DetailProviderRow({ label, items, movieTitle }) {
   if (!items || !items.length) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
       <span style={{ font: '700 10px var(--font-body)', color: 'var(--color-neutral-700)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', minWidth: 44, flex: 'none' }}>{label}</span>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {items.slice(0, 8).map((p) => (
-          p.logoPath ? (
-            <img key={p.id} src={p.logoPath} alt={p.name} title={p.name} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover', flex: 'none' }} />
-          ) : (
-            <span key={p.id} title={p.name} style={{ font: '600 10px var(--font-body)', color: 'var(--color-text)', background: 'var(--color-neutral-100)', padding: '5px 8px', borderRadius: 7, flex: 'none' }}>{p.name}</span>
-          )
+          <a key={p.id} href={providerLinkFor(p.name, movieTitle)} target="_blank" rel="noreferrer" title={p.name} style={{ flex: 'none', display: 'block' }}>
+            {p.logoPath ? (
+              <img src={p.logoPath} alt={p.name} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <span style={{ font: '600 10px var(--font-body)', color: 'var(--color-text)', background: 'var(--color-neutral-100)', padding: '5px 8px', borderRadius: 7, display: 'block' }}>{p.name}</span>
+            )}
+          </a>
         ))}
       </div>
     </div>
