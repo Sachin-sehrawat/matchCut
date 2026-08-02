@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth.js';
-import { fetchMovies, fetchTrailerKey, fetchWatchProviders, SORT_MODES } from '../tmdb.js';
+import { fetchMovies, fetchTrailerKey, fetchWatchProviders, fetchTrendingMovies, SORT_MODES } from '../tmdb.js';
 import { asyncHandler } from '../asyncHandler.js';
 
 const router = Router();
@@ -16,6 +16,19 @@ router.get('/', asyncHandler(async (req, res) => {
     res.json({ movies });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch movies', detail: err.message });
+  }
+}));
+
+// Powers the Reels tab — TMDB's global trending list, independent of the
+// caller's genre/language/region filters or swipe history (Reels is
+// watch-only browsing, not a swipeable deck).
+router.get('/trending', asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  try {
+    const { movies, totalPages } = await fetchTrendingMovies({ page });
+    res.json({ movies, page, totalPages });
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to fetch trending movies', detail: err.message });
   }
 }));
 

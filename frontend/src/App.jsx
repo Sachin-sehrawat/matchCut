@@ -577,6 +577,7 @@ export default function App() {
                   sortMode={sortMode} changeSortMode={changeSortMode}
                 />
               )}
+              {tab === 'reels' && <ReelsScreen />}
               {tab === 'matches' && (
                 <MatchesScreen
                   friendChips={chipFriends}
@@ -982,6 +983,174 @@ function ProviderRow({ label, items, movieTitle }) {
   );
 }
 
+// TikTok-style vertical trailer feed. Self-contained (fetches its own
+// trending list + trailers) since it doesn't interact with the swipe
+// deck/matching state at all — Reels is watch-only browsing.
+function ReelsScreen() {
+  const [movies, setMovies] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [trailerKeys, setTrailerKeys] = useState({});
+  const [muted, setMuted] = useState(true);
+  const itemRefs = useRef(new Map());
+  const observerRef = useRef(null);
+
+  useEffect(() => {
+    api.getTrending(1)
+      .then(({ movies: m, totalPages: tp }) => { setMovies(m); setTotalPages(tp); })
+      .catch(() => setMovies([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // — track which reel is on screen —
+  useEffect(() => {
+    observerRef.current?.disconnect();
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.find((e) => e.isIntersecting && e.intersectionRatio >= 0.6);
+      if (visible) setActiveIndex(Number(visible.target.dataset.index));
+    }, { threshold: [0.6] });
+    itemRefs.current.forEach((el) => observer.observe(el));
+    observerRef.current = observer;
+    return () => observer.disconnect();
+  }, [movies]);
+
+  // — lazily fetch the trailer for the reel currently on screen —
+  useEffect(() => {
+    const movie = movies[activeIndex];
+    if (!movie || trailerKeys[movie.id] !== undefined) return;
+    api.getTrailerKey(movie.id)
+      .then((key) => setTrailerKeys((k) => ({ ...k, [movie.id]: key || null })))
+      .catch(() => setTrailerKeys((k) => ({ ...k, [movie.id]: null })));
+  }, [activeIndex, movies, trailerKeys]);
+
+  // — infinite scroll: load the next page once nearing the end —
+  useEffect(() => {
+    if (loadingMore || page >= totalPages) return;
+    if (activeIndex < movies.length - 3) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    api.getTrending(nextPage)
+      .then(({ movies: m, totalPages: tp }) => {
+        setMovies((prev) => {
+          const seen = new Set(prev.map((x) => x.id));
+          return [...prev, ...m.filter((x) => !seen.has(x.id))];
+        });
+        setPage(nextPage);
+        setTotalPages(tp);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }, [activeIndex, movies.length, page, totalPages, loadingMore]);
+
+  if (loading) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)' }}>Loading reels…</span>
+      </div>
+    );
+  }
+  if (!movies.length) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <span style={{ font: '600 13px var(--font-body)', color: 'rgba(255,255,255,.7)', textAlign: 'center' }}>Couldn't load trending trailers right now.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollSnapType: 'y mandatory', background: '#000' }}>
+      {movies.map((movie, i) => (
+        <ReelItem
+          key={movie.id}
+          movie={movie}
+          active={i === activeIndex}
+          trailerKey={trailerKeys[movie.id]}
+          muted={muted}
+          toggleMuted={() => setMuted((v) => !v)}
+          registerRef={(el) => {
+            if (el) { el.dataset.index = i; itemRefs.current.set(movie.id, el); }
+            else itemRefs.current.delete(movie.id);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// iframes can't be sized with object-fit, so "cover" the container by
+// measuring it directly (percentage/viewport units don't work here: the
+// reel container isn't reliably the full viewport, e.g. on desktop the
+// phone frame is narrower than the browser window).
+function useCoverSize(ref, ratio = 16 / 9) {
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const { width: cw, height: ch } = el.getBoundingClientRect();
+      if (!cw || !ch) return;
+      const containerRatio = cw / ch;
+      setBox(containerRatio > ratio
+        ? { width: cw, height: cw / ratio }
+        : { width: ch * ratio, height: ch });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, ratio]);
+  return box;
+}
+
+function ReelItem({ movie, active, trailerKey, muted, toggleMuted, registerRef }) {
+  const boxRef = useRef(null);
+  const { width, height } = useCoverSize(boxRef);
+  return (
+    <div
+      ref={(el) => { boxRef.current = el; registerRef(el); }}
+      onClick={toggleMuted}
+      style={{ position: 'relative', width: '100%', height: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', background: '#000' }}
+    >
+      <Poster id={movie.id} src={movie.posterUrl} radius={0} />
+      <div style={{ position: 'absolute', inset: 0, backdropFilter: 'blur(30px)', background: 'rgba(0,0,0,.35)' }} />
+      {active && trailerKey && width > 0 && (
+        <iframe
+          key={trailerKey}
+          src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&controls=0&modestbranding=1&playsinline=1&loop=1&playlist=${trailerKey}`}
+          title={movie.title}
+          allow="autoplay; encrypted-media; picture-in-picture"
+          style={{ position: 'absolute', top: '50%', left: '50%', width, height, transform: 'translate(-50%, -50%)', border: 'none' }}
+        />
+      )}
+      {active && trailerKey === null && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ font: '600 12px var(--font-body)', color: 'rgba(255,255,255,.75)' }}>No trailer available</span>
+        </div>
+      )}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '60px 18px 26px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))' }}>
+        <div style={{ font: '800 19px/1.2 var(--font-heading)', color: '#fff', marginBottom: 6 }}>{movie.title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ font: '700 12px var(--font-body)', color: '#fff' }}>★ {movie.rating}</span>
+          {(movie.genres || []).slice(0, 3).map((g) => (
+            <span key={g} style={{ font: '600 9.5px var(--font-body)', color: '#fff', background: 'rgba(255,255,255,.18)', padding: '3px 8px', borderRadius: 20 }}>{g}</span>
+          ))}
+        </div>
+        {movie.desc && (
+          <div style={{ font: '400 11.5px/1.4 var(--font-body)', color: 'rgba(255,255,255,.8)', marginTop: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{movie.desc}</div>
+        )}
+      </div>
+      {active && (
+        <div style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 12px var(--font-body)', color: '#fff' }}>
+          {muted ? '🔇' : '🔊'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MatchesScreen({ friendChips, activeFriendId, setActiveFriendId, activeFriend, commonMovies, onSelectMovie, onDeleteMatch, friendSuperlikes, friendSuperlikesLoading }) {
   const commonCountText = commonMovies.length ? `${commonMovies.length} movie${commonMovies.length > 1 ? 's' : ''} in common` : 'No overlap yet';
   return (
@@ -1232,6 +1401,10 @@ function TabBar({ tab, setTab, tabColor, hasNewMatch }) {
       <button onClick={() => setTab('home')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" /><rect x="7" y="4" width="14" height="10" stroke={tabColor('home')} strokeWidth="2" fill="var(--color-bg)" /></svg>
         <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('home') }}>Discover</span>
+      </button>
+      <button onClick={() => setTab('reels')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <svg width="18" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke={tabColor('reels')} strokeWidth="2" /><path d="M10 8.5v7l6-3.5-6-3.5z" fill={tabColor('reels')} /></svg>
+        <span style={{ font: '700 9.5px var(--font-body)', color: tabColor('reels') }}>Reels</span>
       </button>
       <button onClick={() => setTab('matches')} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, paddingTop: 8, background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.3-9.3-8.5C1 8 2.6 4.8 6 4.4c2-.2 3.7 1 6 3.1 2.3-2.1 4-3.3 6-3.1 3.4.4 5 3.6 3.3 7.1C19 15.7 12 20 12 20z" stroke={tabColor('matches')} strokeWidth="2" /></svg>

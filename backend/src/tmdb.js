@@ -197,6 +197,32 @@ export async function fetchMovies({ genres = [], language, regions = [], userId,
   return movies;
 }
 
+// Independent of any user's onboarding genres/language/region or swipe
+// history — this is TMDB's own global "trending this week" ranking, used to
+// power the Reels tab's trailer feed. Unlike fetchMovies, nothing here is
+// filtered or biased per-user since Reels is watch-only (no swipe actions).
+export async function fetchTrendingMovies({ page = 1 } = {}) {
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) throw new Error('Missing TMDB_API_KEY');
+
+  const params = new URLSearchParams({ api_key: apiKey, page: String(page) });
+  const res = await fetchWithRetry(`${BASE_URL}/trending/movie/week?${params.toString()}`);
+  if (!res.ok) throw new Error(`TMDB request failed: ${res.status}`);
+  const json = await res.json();
+
+  const movies = (json.results || []).map((r) => ({
+    id: String(r.id),
+    title: r.title,
+    desc: r.overview,
+    rating: Math.round((r.vote_average || 0) * 10) / 10,
+    genres: (r.genre_ids || []).map((id) => GENRE_LABELS[id]).filter(Boolean),
+    posterUrl: r.poster_path ? IMAGE_BASE + r.poster_path : null,
+  }));
+
+  await upsertMovies(movies);
+  return { movies, totalPages: json.total_pages || 1 };
+}
+
 function mapProvider(p) {
   return { id: p.provider_id, name: p.provider_name, logoPath: p.logo_path ? PROVIDER_LOGO_BASE + p.logo_path : null };
 }

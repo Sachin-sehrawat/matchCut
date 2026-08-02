@@ -45,6 +45,10 @@ export async function getTrailerKey(movieId) {
   const { key } = await request(`/movies/${movieId}/trailer`);
   return key;
 }
+export async function getTrending(page = 1) {
+  const { movies, totalPages } = await request(`/movies/trending?page=${page}`);
+  return { movies, totalPages };
+}
 export function getWatchProviders(movieId, regions = []) {
   const params = new URLSearchParams();
   if (regions.length) params.set('regions', regions.join(','));
