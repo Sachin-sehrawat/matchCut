@@ -73,3 +73,7 @@ export async function getFriendSuperlikes(friendId) {
   const { movies } = await request(`/friends/${friendId}/superlikes`);
   return movies;
 }
+export async function getMySuperlikes() {
+  const { movies } = await request('/me/superlikes');
+  return movies;
+}

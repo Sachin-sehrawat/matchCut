@@ -13,6 +13,20 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ user: toUserResponse(rows[0]) });
 }));
 
+// The caller's own super-liked movies, newest first — shown on the Profile screen.
+router.get('/superlikes', asyncHandler(async (req, res) => {
+  const { rows: movies } = await pool.query(
+    `SELECT m.tmdb_id AS id, m.title, m.overview AS desc, m.rating, m.genres, m.poster_url AS "posterUrl",
+            s.created_at AS "superlikedAt"
+     FROM swipes s
+     JOIN movies m ON m.tmdb_id = s.movie_id
+     WHERE s.user_id = $1 AND s.direction = 'superlike'
+     ORDER BY s.created_at DESC`,
+    [req.userId],
+  );
+  res.json({ movies });
+}));
+
 router.patch('/preferences', asyncHandler(async (req, res) => {
   const { genres = [], language = null, regions = [] } = req.body || {};
   const { rows } = await pool.query(

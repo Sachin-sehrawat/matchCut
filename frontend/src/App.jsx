@@ -95,6 +95,8 @@ export default function App() {
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [friendSuperlikes, setFriendSuperlikes] = useState([]);
   const [friendSuperlikesLoading, setFriendSuperlikesLoading] = useState(false);
+  const [mySuperlikes, setMySuperlikes] = useState([]);
+  const [mySuperlikesLoading, setMySuperlikesLoading] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [sentInvites, setSentInvites] = useState([]);
   const [inviteError, setInviteError] = useState(null);
@@ -181,6 +183,18 @@ export default function App() {
       .finally(() => { if (!cancelled) setFriendSuperlikesLoading(false); });
     return () => { cancelled = true; };
   }, [activeFriendId]);
+
+  // — my own super likes (Profile tab) —
+  useEffect(() => {
+    if (screen !== 'app' || tab !== 'profile') return;
+    setMySuperlikesLoading(true);
+    let cancelled = false;
+    api.getMySuperlikes()
+      .then((movies) => { if (!cancelled) setMySuperlikes(movies); })
+      .catch(() => { if (!cancelled) setMySuperlikes([]); })
+      .finally(() => { if (!cancelled) setMySuperlikesLoading(false); });
+    return () => { cancelled = true; };
+  }, [screen, tab]);
 
   // — drag binding —
   useEffect(() => {
@@ -583,6 +597,8 @@ export default function App() {
                   superlikesLeft={superlikesLeft} superlikeLimit={SUPERLIKE_LIMIT}
                   openPaywall={openPaywall} prefsSummary={prefsSummary}
                   goToOnboarding={goToOnboarding} goToLogin={goToLogin}
+                  mySuperlikes={mySuperlikes} mySuperlikesLoading={mySuperlikesLoading}
+                  onSelectMovie={openMovieDetail}
                 />
               )}
             </div>
@@ -1128,7 +1144,7 @@ function FriendsScreen({ usernameInput, onUsernameChange, sendUsernameInvite, se
   );
 }
 
-function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, prefsSummary, goToOnboarding, goToLogin }) {
+function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, prefsSummary, goToOnboarding, goToLogin, mySuperlikes, mySuperlikesLoading, onSelectMovie }) {
   const isFounder = user?.role === 'founder';
   const pct = Math.round((superlikesLeft / superlikeLimit) * 100);
   return (
@@ -1161,6 +1177,24 @@ function ProfileScreen({ user, superlikesLeft, superlikeLimit, openPaywall, pref
           </>
         )}
       </div>
+
+      <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 8 }}>Your Super Likes</div>
+      {mySuperlikesLoading ? (
+        <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 22 }}>Loading…</div>
+      ) : mySuperlikes.length > 0 ? (
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginBottom: 22 }}>
+          {mySuperlikes.map((m) => (
+            <button key={m.id} onClick={() => onSelectMovie(m)} style={{ flex: 'none', width: 84, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+              <div style={{ width: 84, height: 120, background: 'var(--color-neutral-300)', overflow: 'hidden', borderRadius: 12, position: 'relative', marginBottom: 6 }}>
+                <Poster id={m.id} src={m.posterUrl} radius={12} />
+              </div>
+              <span style={{ display: 'block', font: '700 11.5px/1.3 var(--font-body)', color: 'var(--color-text)' }}>{m.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ font: '400 12.5px var(--font-body)', color: 'var(--color-neutral-700)', marginBottom: 22 }}>No super likes yet — superlike a movie in Discover to see it here.</div>
+      )}
 
       <div style={{ font: '700 12px var(--font-heading)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--color-neutral-700)', marginBottom: 8 }}>Preferences</div>
       <button onClick={goToOnboarding} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--color-divider)', background: 'none', border: 'none', borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-divider)', cursor: 'pointer', textAlign: 'left' }}>
